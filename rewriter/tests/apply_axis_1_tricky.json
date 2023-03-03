@@ -1,0 +1,6 @@
+{"raw": "df = pd.read_csv('titanic.csv')\n",
+"modified": "df = pd.read_csv('titanic.csv')\n"},
+{"raw": "our = df.apply(foo, axis=1)\n",
+"modified": "our = df.apply(foo, axis=1)\n"},
+{"raw": "our = df.apply(bar, axis=1)\n",
+"modified": "our = df.apply(bar, axis=1)\n"},

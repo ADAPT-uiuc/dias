@@ -1,0 +1,2 @@
+{"raw": "def weighted_rating(x, m=m, C=C):\n    v = x['vote_count']\n    R = x['vote_average']\n    # Calculation based on the IMDB formula\n    return (v/(v+m) * R) + (m/(m+v) * C)\nq_movies['score'] = q_movies.apply(weighted_rating, axis=1)\n",
+"modified": "def weighted_rating(x, m=m, C=C):\n    v = x['vote_count']\n    R = x['vote_average']\n    return v / (v + m) * R + m / (m + v) * C\nq_movies['score'] = weighted_rating(q_movies)\n"},

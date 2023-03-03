@@ -1,0 +1,2 @@
+{"raw": "def weighted_rating(x):\n    v = x['vote_count']\n    R = x['vote_average']\n    return (v/(v+m) * R) + (m/(m+v) * C)\nqualified['wr'] = qualified.apply(weighted_rating, axis=1)\n",
+"modified": "def weighted_rating(x):\n    v = x['vote_count']\n    R = x['vote_average']\n    return v / (v + m) * R + m / (m + v) * C\nqualified['wr'] = weighted_rating(qualified)\n"},

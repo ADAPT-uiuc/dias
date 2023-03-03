@@ -1,0 +1,2 @@
+{"raw": "lowest_df = train_df.sort_values('total_score').head(4)\n",
+"modified": "lowest_df = train_df.nsmallest(n=4, columns='total_score')\n"},

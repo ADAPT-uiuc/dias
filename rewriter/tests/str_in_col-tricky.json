@@ -1,0 +1,2 @@
+{"raw": "for col in df.columns:\n    if '12 ' in df[col].to_string():\n        pass\n",
+"modified": "for col in df.columns:\n    if '12 ' in df[col].to_string():\n        pass\n"},

@@ -1,0 +1,4 @@
+{"raw": "df = pd.read_csv('titanic.csv')\n",
+"modified": "df = pd.read_csv('titanic.csv')\n"},
+{"raw": "our = df.apply(foo, axis=1)\n",
+"modified": "def _REWR_tmp_0(row):\n    if row > 10:\n        return True\n    return False\nour = df['Fare'].apply(_REWR_tmp_0)\n"},

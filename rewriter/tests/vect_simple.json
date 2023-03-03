@@ -1,0 +1,2 @@
+{"raw": "our = df.apply(set_feature, axis=1)\n",
+"modified": "our = np.select([df['Pclass'] == 1], [True], default=False)\n"},

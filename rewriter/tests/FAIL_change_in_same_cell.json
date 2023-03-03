@@ -1,0 +1,4 @@
+{"raw": "df = pd.read_csv('titanic.csv')\n# Change in the same cell. Here, we will save the version of `df` _after_ this change, while we have\n# to save the one before.\ndf['Cabin'] = df['Cabin'].fillna('blah')\n",
+"modified": "df = pd.read_csv('titanic.csv')\ndf['Cabin'].fillna('blah', inplace=True)\n"},
+{"raw": "pd.read_csv('titanic.csv')\n",
+"modified": "pd.read_csv('titanic.csv')\n"},

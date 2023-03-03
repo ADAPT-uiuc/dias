@@ -1,0 +1,2 @@
+{"raw": "df_ea = df.loc[(df['Industry'].isin(env)) | (df['Industry'].isin(ai))].reset_index(drop=True,inplace=False)\n",
+  "modified": "df_ea = df.loc[df['Industry'].isin(env + ai)].reset_index(drop=True,\n    inplace=False)\n"},

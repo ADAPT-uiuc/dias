@@ -1,0 +1,2 @@
+{"raw": "our = df.apply(set_feature, axis=1)\n",
+"modified": "our = np.select([df['Cabin'].isin(cabins1) | df['Cabin'].isin(cabins2)], [\n    True], default=False)\n"},
