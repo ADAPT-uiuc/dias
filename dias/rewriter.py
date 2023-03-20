@@ -781,13 +781,15 @@ def rewrite_and_exec(cell_ast: ast.Module, ipython: InteractiveShell) -> Tuple[s
       pd_concat_call = pd_Series_call
       left_df = patt.left_ser_call.get_sub().get_df()
       left_ser = patt.left_ser_call.get_sub().get_Series()
-      right_df = patt.left_ser_call.get_sub().get_df()
-      right_ser = patt.left_ser_call.get_sub().get_Series()
+      right_df = patt.right_ser_call.get_sub().get_df()
+      right_ser = patt.right_ser_call.get_sub().get_Series()
       pd_concat_call.args[0] = \
         ast.List(
           elts=[ast.Subscript(value=ast.Name(id=left_df), slice=ast.Constant(value=left_ser)),
                 ast.Subscript(value=ast.Name(id=right_df), slice=ast.Constant(value=right_ser))]
         )
+      pd_concat_call.keywords = [ast.keyword(arg="ignore_index", value=ast.Constant(value=True))]
+      print(astor.to_source(pd_concat_call))
       # The above implicitly modifies stmt
 
       stats[type(patt).__name__] = 1
