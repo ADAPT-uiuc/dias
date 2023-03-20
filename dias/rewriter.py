@@ -1412,6 +1412,8 @@ def rewrite(line: str, cell: str):
         # but the defaults are not amazing enough to be worth adding an extra dependency.
         display(Markdown(f"""
 ### Dias rewrote code:
+<br />
+
 ```python
 {new_source}
 ```
