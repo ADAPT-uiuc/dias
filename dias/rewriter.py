@@ -14,9 +14,8 @@ import numpy as np
 ### NON-DEFAULT PACKAGES: The user has to have these installed
 import astor
 
-sys.path.insert(1, '../')
-import patt_matcher
-import nb_utils
+import dias.patt_matcher as patt_matcher
+import dias.nb_utils as nb_utils
 
 ############ CONFIGURATIONS ############
 

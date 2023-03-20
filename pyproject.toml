@@ -1,0 +1,20 @@
+[project]
+name = "dias"
+version = "0.0.1.1"
+authors = [
+  { name="Stefanos Baziotis", email="sb54@illinois.edu" },
+]
+description = "Dynamic rewriting of pandas code"
+readme = "README.md"
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "pandas >= 1.5.1",
+    "astor >= 0.8.1",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/ADAPT-uiuc/dias"
