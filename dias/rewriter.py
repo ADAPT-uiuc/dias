@@ -789,7 +789,6 @@ def rewrite_and_exec(cell_ast: ast.Module, ipython: InteractiveShell) -> Tuple[s
                 ast.Subscript(value=ast.Name(id=right_df), slice=ast.Constant(value=right_ser))]
         )
       pd_concat_call.keywords = [ast.keyword(arg="ignore_index", value=ast.Constant(value=True))]
-      print(astor.to_source(pd_concat_call))
       # The above implicitly modifies stmt
 
       stats[type(patt).__name__] = 1
@@ -1397,8 +1396,6 @@ def rewrite(line: str, cell: str):
   # dbg_print(astor.dump(cell_ast))
   # dbg_print("--------- Modify AST -----------")
   new_source, hit_stats, time_spent_in_exec = rewrite_and_exec(cell_ast, ipython)
-# <div style="margin-top: 5px; padding: 5px; font-family: courier, monspace; border: 1px solid #ccc; background-color: #f5f5f5;">
-# </div>
   if line.strip() == "verbose":
     if not len(hit_stats):
       if not is_notebook_env():
