@@ -1,5 +1,6 @@
 from IPython.core.magic import register_cell_magic
 from IPython import get_ipython, InteractiveShell
+from IPython.display import display, Markdown
 import ast
 import os
 import sys
@@ -10,7 +11,6 @@ import json
 import time
 import pandas as pd
 import numpy as np
-from IPython.display import display, Markdown, HTML
 
 ### NON-DEFAULT PACKAGES: The user has to have these installed
 import astor
@@ -32,7 +32,6 @@ disabled_patts = set()
 if "_IREWR_DISABLED_PATTS" in os.environ:
   disabled_patts = ast.literal_eval(os.environ["_IREWR_DISABLED_PATTS"])
 
-
 ############ UTILS ############
 
 _REWR_id_counter = 0
@@ -40,7 +39,20 @@ def get_unique_id():
   global _REWR_id_counter
   res = "_REWR_tmp_" + str(_REWR_id_counter)
   _REWR_id_counter = _REWR_id_counter + 1
-  return res 
+  return res
+
+# Source: https://stackoverflow.com/a/39662359
+def is_notebook_env() -> bool:
+  try:
+    shell = get_ipython().__class__.__name__
+    if shell == 'ZMQInteractiveShell':
+      return True   # Jupyter notebook or qtconsole
+    elif shell == 'TerminalInteractiveShell':
+      return False  # Terminal running IPython
+    else:
+      return False  # Other type (?)
+  except NameError:
+    return False      # Probably standard Python interpreter
 
 def get_mod_time(filepath):
   return os.path.getmtime(filepath)
@@ -592,7 +604,7 @@ def sliced_execution(list_of_lists: List[List[ast.stmt]],
   return new_source, stats, time_spent_in_exec
 
 # I don't think we can declare a type for `ipython`
-def rewrite_and_exec(cell_ast: ast.Module, ipython: InteractiveShell) -> Tuple[str, int, Dict]:
+def rewrite_and_exec(cell_ast: ast.Module, ipython: InteractiveShell) -> Tuple[str, Dict, Dict]:
   assert isinstance(cell_ast, ast.Module)
   body = cell_ast.body
   matched_patts = patt_matcher.patt_match(body)
@@ -1386,29 +1398,24 @@ def rewrite(line: str, cell: str):
 # <div style="margin-top: 5px; padding: 5px; font-family: courier, monspace; border: 1px solid #ccc; background-color: #f5f5f5;">
 # </div>
   if line.strip() == "verbose":
-    display(Markdown(f"""
-#### Dias output
+    if not len(hit_stats):
+      if not is_notebook_env():
+        print("### Dias did not rewrite code")
+      else:
+        display(Markdown("### Dias did not rewrite code"))
+    else:
+      if not is_notebook_env():
+        print("### Dias rewrote code:")
+        print(new_source)
+      else:
+        # This looks kind of ugly. But there are no great solutions. Probably the best alternative is pygments,
+        # but the defaults are not amazing enough to be worth adding an extra dependency.
+        display(Markdown(f"""
+### Dias rewrote code:
 ```python
 {new_source}
 ```
-                     """))
-  # By default, code inside ``` is on white background. It's not a big problem but here's some crappy JS
-  # to put it on a grey background and make it a bit smaller.
-  get_ipython().run_cell("""
-  %%javascript
-  var els = document.querySelectorAll(".output_markdown code");
-  for (var i = 0; i < els.length; ++i) {
-    els[i].style.backgroundColor = "#f5f5f5";
-  }
-  var els = document.querySelectorAll(".output_markdown pre");
-  for (var i = 0; i < els.length; ++i) {
-    els[i].style.backgroundColor = "#f5f5f5";
-    els[i].style.padding = "5px";
-    els[i].style.marginTop = "5px";
-    els[i].style.fontSize = "11px";
-  }
-  """)
-
+"""))
 
   # Create the JSON.
   if _IREWR_JSON_STATS:
