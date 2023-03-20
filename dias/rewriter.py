@@ -10,6 +10,7 @@ import json
 import time
 import pandas as pd
 import numpy as np
+from IPython.display import display, Markdown, HTML
 
 ### NON-DEFAULT PACKAGES: The user has to have these installed
 import astor
@@ -1362,15 +1363,15 @@ def rewrite_and_exec(cell_ast: ast.Module, ipython: InteractiveShell) -> Tuple[s
 # by the caller. The name of the function is the name of the magic function that we use on the cell.
 # For example, here we write %%rewrite at the top of a cell.
 @register_cell_magic
-def rewrite(line, cell: str):
+def rewrite(line: str, cell: str):
   # TODO: Is this a good idea or we should ask it every time we want to use it?
   ipython = get_ipython()
 
   # Skip magic functions
   lines = cell.split('\n')
   save_idx = -1
-  for idx, line in enumerate(lines):
-    if not line.strip().startswith('%%'):
+  for idx, ln in enumerate(lines):
+    if not ln.strip().startswith('%%'):
       save_idx = idx
       break
   assert save_idx != -1
@@ -1382,8 +1383,32 @@ def rewrite(line, cell: str):
   # dbg_print(astor.dump(cell_ast))
   # dbg_print("--------- Modify AST -----------")
   new_source, hit_stats, time_spent_in_exec = rewrite_and_exec(cell_ast, ipython)
-  # dbg_print("--------- Final Source -----------")
-  # dbg_print(new_source)
+# <div style="margin-top: 5px; padding: 5px; font-family: courier, monspace; border: 1px solid #ccc; background-color: #f5f5f5;">
+# </div>
+  if line.strip() == "verbose":
+    display(Markdown(f"""
+#### Dias output
+```python
+{new_source}
+```
+                     """))
+  # By default, code inside ``` is on white background. It's not a big problem but here's some crappy JS
+  # to put it on a grey background and make it a bit smaller.
+  get_ipython().run_cell("""
+  %%javascript
+  var els = document.querySelectorAll(".output_markdown code");
+  for (var i = 0; i < els.length; ++i) {
+    els[i].style.backgroundColor = "#f5f5f5";
+  }
+  var els = document.querySelectorAll(".output_markdown pre");
+  for (var i = 0; i < els.length; ++i) {
+    els[i].style.backgroundColor = "#f5f5f5";
+    els[i].style.padding = "5px";
+    els[i].style.marginTop = "5px";
+    els[i].style.fontSize = "11px";
+  }
+  """)
+
 
   # Create the JSON.
   if _IREWR_JSON_STATS:
