@@ -707,10 +707,7 @@ def rewrite_and_exec(cell_ast: ast.Module, ipython: InteractiveShell) -> Tuple[s
       print(type(patt).__name__)
       continue
 
-    if (isinstance(patt, patt_matcher.CompatReadCSV) or
-        isinstance(patt, patt_matcher.HasCacheableCall)):
-      pass
-    elif isinstance(patt, patt_matcher.HasSubstrSearchApply):
+    if isinstance(patt, patt_matcher.HasSubstrSearchApply):
       assert isinstance(patt, patt_matcher.HasSubstrSearchApply)
       assert len(stmt_idxs) == 1
       stmt_idx = stmt_idxs[0]

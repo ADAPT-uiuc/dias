@@ -460,22 +460,6 @@ def is_Series_call_from_encl_call(encl_call: OptEnclosed[ast.Call]) -> Optional[
 def is_Series_call_unkn(n: ast.AST) -> Optional[SeriesCall]:
   if not isinstance(n, ast.Call):
     return None
-  
-
-class HasCacheableCall:
-  ACCEPTED_FUNCS : Final[Set[str]] = {'isnull', 'isna', 'min', 'max', 'std', 'mean', 'sum', 'count'}
-
-  def __init__(self, series_call: SeriesCall, dont_use_the_constructor_directly: bool) -> None:
-    self.series_call = series_call
-    assert _a(dont_use_the_constructor_directly)
-
-# If we can't find an cacheable <call>(), it returns None.
-# Otherwise, it returns an IsCacheableCall
-def has_cacheable_call(series_call: SeriesCall) -> Optional[HasCacheableCall]:
-  func = series_call.attr_call.get_func()
-  if func in HasCacheableCall.ACCEPTED_FUNCS:
-    return HasCacheableCall(series_call=series_call, dont_use_the_constructor_directly=True)
-  return None
 
 class HasSubstrSearchApply:
   # We could compute all the arguments instead of storing them, but it will be a lot of
@@ -651,10 +635,7 @@ def has_tolist_concat_toSeries(call_name: CallOnName) -> Optional[HasToListConca
                                   right_ser_call=right_ser_call,
                                   dont_use_the_constructor_directly=True)
 
-def series_call_patts(series_call: SeriesCall) -> Optional[Union[HasCacheableCall, HasSubstrSearchApply, IsInplaceUpdate]]:
-  cacheable_call: Optional[HasCacheableCall] = has_cacheable_call(series_call)
-  if cacheable_call is not None:
-    return cacheable_call
+def series_call_patts(series_call: SeriesCall) -> Optional[Union[HasSubstrSearchApply, IsInplaceUpdate]]:
   substr_apply: Optional[HasSubstrSearchApply] = has_substring_search_apply(series_call)
   if substr_apply is not None:
     return substr_apply
@@ -1568,7 +1549,6 @@ Single_Stmt_Patts = \
 Union[
   CompatReadCSV,
   CompatToCSV,
-  HasCacheableCall,
   HasSubstrSearchApply,
   IsInplaceUpdate,
   HasToListConcatToSeries,
