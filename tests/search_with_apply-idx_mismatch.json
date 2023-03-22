@@ -1,0 +1,2 @@
+{"raw": "rewr = df['Name'].apply(lambda s: 'G' in s)\n",
+"modified": "_REWR_tmp_0 = df['Name']\n_REWR_tmp_1 = _REWR_tmp_0.tolist()\n_REWR_tmp_2 = [('G' in s) for s in _REWR_tmp_1]\nrewr = pd.Series(_REWR_tmp_2, index=_REWR_tmp_0.index)\n"},

@@ -708,7 +708,6 @@ def rewrite_and_exec(cell_ast: ast.Module, ipython: InteractiveShell) -> Tuple[s
       continue
 
     if isinstance(patt, patt_matcher.HasSubstrSearchApply):
-      assert isinstance(patt, patt_matcher.HasSubstrSearchApply)
       assert len(stmt_idxs) == 1
       stmt_idx = stmt_idxs[0]
       stmt_list = list_of_lists[stmt_idx]
@@ -717,14 +716,19 @@ def rewrite_and_exec(cell_ast: ast.Module, ipython: InteractiveShell) -> Tuple[s
       df = patt.series_call.get_sub().get_df()
       if not check_DataFrame(df, ipython):
         continue
-      
+
+      sub = patt.series_call.get_sub().get_sub_ast()
+
+      tmp_sub_id: str = get_unique_id()
+      tmp_sub_name = ast.Name(id=tmp_sub_id)
+      tmp_sub_asgn = ast.Assign(targets=[tmp_sub_name], value=sub)
+
       listified_id: str = get_unique_id()
       listified = ast.Name(id=listified_id)
 
-      sub = patt.series_call.get_sub().get_sub_ast()
       listify_stmt = \
         ast.Assign(targets=[listified],
-          value=AST_attr_call(called_on=sub, name='tolist'))
+          value=AST_attr_call(called_on=tmp_sub_name, name='tolist'))
 
       pred_id: str = get_unique_id()
       pred = ast.Name(id=pred_id)
@@ -735,13 +739,21 @@ def rewrite_and_exec(cell_ast: ast.Module, ipython: InteractiveShell) -> Tuple[s
           generators=[ast.comprehension(target=patt.get_needle(), iter=listified, ifs=[], is_async=0)]),
         type_comment=None)
 
-      stmt_list[0] = listify_stmt
+      stmt_list[0] = tmp_sub_asgn
+      stmt_list.append(listify_stmt)
       stmt_list.append(pred_stmt)
       stmt_list.append(stmt)
 
       # This implicitly updates `stmt`
       opt_call = patt.series_call.attr_call.call
-      opt_call.set_enclosed_obj(pred)
+      res_to_series = \
+        AST_attr_call(ast.Name("pd"), 
+                      ast.Name("Series"), args=[pred])
+      res_to_series.keywords = [ast.keyword(arg="index", value=ast.Attribute(value=tmp_sub_name, attr="index"))]
+      opt_call.set_enclosed_obj(res_to_series)
+
+      assert isinstance(patt, patt_matcher.HasSubstrSearchApply)
+
 
       stats[type(patt).__name__] = 1
     elif isinstance(patt, patt_matcher.IsInplaceUpdate):
