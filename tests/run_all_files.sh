@@ -8,9 +8,7 @@ for ipynb_file in *.ipynb; do
       exit 1
     fi
     # Changing directory just makes everything easier
-    cd ..
-    _IREWR_JSON_STATS="True" ipython tests/$ipynb_file 2> tests/tmp.json 1> /dev/null
-    cd tests
+    _IREWR_JSON_STATS="True" ipython $ipynb_file 2> tmp.json 1> /dev/null
     python tester.py tmp.json $correct_output_json 2> /dev/null
     exit_code=$?
     if [[ $exit_code -ne 0 ]]; then

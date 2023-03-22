@@ -1,0 +1,2 @@
+{"raw": "_ = pd.Series(df['Name'].tolist() + df['Name'].tolist())\n",
+"modified": "_ = pd.concat([df['Name'], df['Name']], ignore_index=True)\n"},

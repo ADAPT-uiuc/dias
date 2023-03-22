@@ -3,7 +3,7 @@ import sys
 import difflib
 
 sys.path.insert(1, '../../')
-import nb_utils
+import dias.nb_utils as nb_utils
 
 to_test = sys.argv[1]
 correct = sys.argv[2]
