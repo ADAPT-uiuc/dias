@@ -12,78 +12,6 @@ def _a(e: bool):
 
 ############ PATTERN RECOGNIZERS ############
 
-class CompatReadCSV:
-  def __init__(self, filename: str, assigned_to):
-    self.filename: str = filename
-    self.assigned_to: Optional[ast.Name] = assigned_to
-
-  def is_assigned(self) -> bool:
-    return self.assigned_to is not None
-
-# A compatible read_csv() is:
-# - On a constant filename. i.e., it's like read_csv('test.csv') and not read_csv(a)
-# - With only one argument
-# - Might or might not save the result in a variable
-# TODO: This really needs to be rewritten with the new functions and types we have (i.e., AttrCall etc.)
-def is_compatible_read_csv(stmt) -> Optional[CompatReadCSV]:
-  def handle_call(call):
-    name_is_pd = False
-    attr_is_read_csv = False
-    if isinstance(call, ast.Call):
-      func = call.func
-      if isinstance(func, ast.Attribute):
-        if isinstance(func.value, ast.Name):
-          if func.value.id == "pd":
-            name_is_pd = True
-        if func.attr == 'read_csv':
-          attr_is_read_csv = True
-
-      if len(call.keywords) != 0:
-        return None
-
-      # Check if the argument is constant file
-      filename = None
-      if len(call.args) > 0:
-        arg0 = call.args[0]
-        if (isinstance(arg0, ast.Constant) and
-            isinstance(arg0.value, str)):
-          value_str = arg0.value
-          filename = value_str
-
-      if name_is_pd and attr_is_read_csv and filename is not None:
-        return filename
-
-    return None
-
-  ### FUNC CODE ###
-
-  filename = None
-  assigned_to = None
-  if isinstance(stmt, ast.Assign):
-    targets = stmt.targets
-    if len(targets) != 1:
-      return None
-    name = targets[0]
-    if not isinstance(name, ast.Name):
-      return None
-    assigned_to = name
-
-    call = stmt.value
-    filename = handle_call(call)
-  elif isinstance(stmt, ast.Expr):
-    # A read_csv() that is not assigned somewhere
-    assigned_to = None
-    call = stmt.value
-    filename = handle_call(call)
-  else:
-    return None
-
-  is_compatible_call = filename is not None
-  if is_compatible_call:
-    return CompatReadCSV(filename, assigned_to)
-
-  return None
-
 _T = TypeVar('_T')
 
 # Optionally enclosed object. Why:
@@ -283,36 +211,6 @@ def is_call_on_name(attr_call: AttrCall) -> Optional[CallOnName]:
   if isinstance(attr_ast.value, ast.Name):
     return CallOnName(attr_call=attr_call, dont_use_the_constructor_directly=True)
   return None
-
-class CompatToCSV:
-  def __init__(self, filename: str):
-    self.filename: str = filename
-
-def is_compat_to_csv(call_name: CallOnName) -> Optional[CompatToCSV]:
-  if call_name.attr_call.get_func() != "to_csv":
-    return None
-  
-  call = call_name.attr_call.call.get_obj()
-  # We should actually match 2 args, because almost all to_csv()
-  # have a index=False argument. But, this is a named arg, so we don't
-  # find it in .args. See below.
-  if len(call.args) != 1:
-    return None
-  
-  arg0 = call.args[0]
-  constant_str = isinstance(arg0, ast.Constant) and isinstance(arg0.value, str)
-  if not constant_str:
-    return None
-  
-  # Silence mypy
-  assert isinstance(arg0, ast.Constant)
-  filename = arg0.value
-  return CompatToCSV(filename=filename)
-
-class ToCSVThenReadCSV:
-  def __init__(self, to_csv: CompatToCSV, read_csv: CompatReadCSV) -> None:
-    self.to_csv = to_csv
-    self.read_csv = read_csv
 
 class IsTrivialDFCall:
   # NOTE: 'solution' and 'hint' are functions from Kaggle to help users.
@@ -1547,8 +1445,6 @@ def is_fuse_apply(attr_call: AttrCall) -> Optional[FuseApply]:
 # patterns that match this stmt.
 Single_Stmt_Patts = \
 Union[
-  CompatReadCSV,
-  CompatToCSV,
   HasSubstrSearchApply,
   IsInplaceUpdate,
   HasToListConcatToSeries,
@@ -1583,11 +1479,6 @@ def recognize_pattern(stmt: ast.stmt) ->  Optional[Single_Stmt_Patts]:
     return IsTrivialDFCall()
 
   # Otherwise, proceed with the actual patterns
-  compat_read_csv: Optional[CompatReadCSV] = is_compatible_read_csv(stmt)
-  if compat_read_csv is not None:
-    return compat_read_csv
-  # TODO: We need to somehow stop this walk early. For example, if the node
-  # is a Subscript, then it won't match any pattern.
 
   ### Top-Level Patterns ###
   str_attr_indexed = is_str_attr_indexed(stmt)
@@ -1608,6 +1499,8 @@ def recognize_pattern(stmt: ast.stmt) ->  Optional[Single_Stmt_Patts]:
       return sub_to_sub_replace
 
   str_in_cols: List[StrInCol] = []
+  # TODO: We need to somehow stop this walk early. For example, if the node
+  # is a Subscript, then it won't match any pattern.
   for n in ast.walk(stmt):
     for cmp_encl in search_enclosed(n, ast.Compare):
       str_in_col: StrInCol = is_str_in_col(cmp_encl)
@@ -1679,10 +1572,6 @@ def recognize_pattern(stmt: ast.stmt) ->  Optional[Single_Stmt_Patts]:
           tolist_concat_toSeries = has_tolist_concat_toSeries(call_name)
           if tolist_concat_toSeries is not None:
             return tolist_concat_toSeries
-
-          to_csv = is_compat_to_csv(call_name)
-          if to_csv is not None:
-            return to_csv
         
         replace_remove_list = is_replace_remove_list(attr_call)
         if replace_remove_list is not None:
@@ -1725,7 +1614,6 @@ class FusableReplaceUnique:
 Available_Patterns = \
 Union[
   Single_Stmt_Patts,
-  ToCSVThenReadCSV,
   FusableStrSplit,
   FusableReplaceUnique,
 ]
@@ -1734,8 +1622,6 @@ Union[
 # It matches the biggest possible pattern. The patterns don't overlap.
 def patt_match(body: List[ast.stmt]) -> List[Tuple[Available_Patterns, List[int]]]:
   res: List[Tuple[Available_Patterns, List[int]]] = []
-  # filename -> (to_csv, stmt_idx)
-  matched_to_csv: Dict[str, Tuple[CompatToCSV, int]] = dict()
 
   single_stmt_patts: List[Single_Stmt_Patts] = []
   for stmt_idx, stmt in enumerate(body):
@@ -1752,15 +1638,6 @@ def patt_match(body: List[ast.stmt]) -> List[Tuple[Available_Patterns, List[int]
     ### INCREMENTING stmt_idx
     ##############################################
 
-
-    # to_csv()'s are treated specially, because they can appear on their own,
-    # or they can appear as part of a bigger pattern, which is to_csv(f) -> read_csv(f).
-    # If we match one, we don't save it into the result yet but we log it.
-    # Then, if we stumble upon a read_csv(), we check whether there exists
-    # an earlier to_csv() on the same filename, and if so, we remove the to_csv()
-    # from the dictionary and we put into the result this bigger pattern.
-    # At the end, we will add to the result all the to_csv()'s that have
-    # remained.
     # NOTE: We don't preserve the program order from statements to patterns.
     # Meaning, imagine that we have only N statements, and one pattern for each.
     # In the result list, the pattern corresponding to statement 0 won't necessarily
@@ -1769,18 +1646,7 @@ def patt_match(body: List[ast.stmt]) -> List[Tuple[Available_Patterns, List[int]
 
     if patt is None:
       pass
-    if isinstance(patt, CompatToCSV):
-      matched_to_csv[patt.filename] = (patt, stmt_idx)
-    elif isinstance(patt, CompatReadCSV):
-      filename = patt.filename
-      if filename in matched_to_csv:
-        to_csv, to_csv_idx = matched_to_csv[filename]
-        # This should NOT invalidate `to_csv`
-        del matched_to_csv[filename]
-        res.append((ToCSVThenReadCSV(to_csv, read_csv=patt), [to_csv_idx, stmt_idx]))
-      else:
-        res.append((patt, [stmt_idx]))
-    elif isinstance(patt, StrSplitPython):
+    if isinstance(patt, StrSplitPython):
       if patt.expand_true:
         res.append((patt, [stmt_idx]))
       else:
@@ -1819,11 +1685,6 @@ def patt_match(body: List[ast.stmt]) -> List[Tuple[Available_Patterns, List[int]
 
     stmt_idx = stmt_idx + 1
   # END OF WHILE LOOP
-
-  # Add the remaining to_csv()'s that are not part of
-  # a ToCSVThenReadCSV
-  for to_csv, stmt_idx in matched_to_csv.values():
-    res.append((to_csv, [stmt_idx]))
   
   return res
 
