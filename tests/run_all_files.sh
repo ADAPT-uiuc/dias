@@ -1,5 +1,11 @@
 #!/bin/bash
 
+cd ..
+python3 -m build
+pip uninstall dias -y
+pip install dist/dias*.whl
+cd tests
+
 for ipynb_file in *.ipynb; do
     [ -f "$ipynb_file" ] || break
     correct_output_json="${ipynb_file%.ipynb}.json"
