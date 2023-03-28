@@ -158,13 +158,13 @@ Our [Quickstart notebook](https://colab.research.google.com/drive/1Pe0N8pqfUReVW
 ### How lightweight is Dias?
 Dias is extremely lightweight. In terms of memory overheads, anything that runs with vanilla `pandas`, runs with Dias enabled too. Dias is just a code rewriter, so it does not alter the way `pandas` stores data and its internal state is minimal.
 
-Dias' runtime overheads are minimal too. In [our experiments](https://baziotis.cs.illinois.edu/papers/dias.pdf), the maximum overhead of Dias is 23ms. You may also want to take a look at [this example](https://github.com/baziotis/dias-readme-test/blob/main/examples/crossing-boundaries.ipynb), where even though the original cell is quick, it is still worth using Dias.
+Dias' runtime overheads are minimal too. In [our experiments](https://baziotis.cs.illinois.edu/papers/dias.pdf), the maximum overhead of Dias is 23ms. You may also want to take a look at [this example](https://github.com/ADAPT-uiuc/dias/blob/main/examples/crossing-boundaries.ipynb), where even though the original cell is quick, it is still worth using Dias.
 
 ### Can I inspect the rewritten version?
 
 Yes. Dias' output is standard Python code, and so, for example, you do not need to know anything about Dias to know why you got a speedup. Similarly, you can just copy Dias' output and use it as any other Python code.
 
-To inspect the rewritten version, use ``%%rewrite verbose``. See [this example](https://github.com/baziotis/dias-readme-test/blob/main/examples/inspecting_output.ipynb).
+To inspect the rewritten version, use ``%%rewrite verbose``. See [this example](https://github.com/ADAPT-uiuc/dias/blob/main/examples/inspecting_output.ipynb).
 
 ### Is Dias a replacement for `pandas`?
 No (which inherently means Dias does not suffer from lack of API support). Dias is a rewriter, which inspects and possibly rewrites `pandas` code.
@@ -174,7 +174,7 @@ No. Dias depends on IPython's feature of [magic functions](https://ipython.readt
 
 ### When does Dias rewrite code?
 
-Dias looks for certain patterns, and upon recognizing one, it rewrites the code to a faster version. Thus, Dias will rewrite the code if it contains one of the patterns it is programmed to look for. Consider [this example](https://github.com/baziotis/dias-readme-test/blob/main/examples/nsmallest.ipynb). One pattern Dias looks for is any expression followed by `sort_values()`, followed by `head()`. Upon recognizing this pattern, it rewrites the code to use `nsmallest()`. You can take a look at [the paper](https://baziotis.cs.illinois.edu/papers/dias.pdf) for more information.
+Dias looks for certain patterns, and upon recognizing one, it rewrites the code to a faster version. Thus, Dias will rewrite the code if it contains one of the patterns it is programmed to look for. Consider [this example](https://github.com/ADAPT-uiuc/dias/blob/main/examples/nsmallest.ipynb). One pattern Dias looks for is any expression followed by `sort_values()`, followed by `head()`. Upon recognizing this pattern, it rewrites the code to use `nsmallest()`. You can take a look at [the paper](https://baziotis.cs.illinois.edu/papers/dias.pdf) for more information.
 
 Dias is still under early but active development, so expect more patterns to be added soon!
 
