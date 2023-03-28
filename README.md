@@ -184,6 +184,6 @@ No and no. Dias is not probabilistic; if it rewrites code, it is always correct 
 
 ## How to contribute
 
-Dias is an ongoing research project by the [ADAPT group @ UIUC](https://github.com/ADAPT-uiuc). You can help us by sending us notebooks that you want to speed up and we will our best to make Dias do it automatically ([send us an email](mailto:sb54@illinois.edu) with either the notebook or Colab link)! Moreover, if you are aware of a pattern that can be rewritten to a faster version, please consider submitting an issue, with a minimum working example, that contains the original code and the rewritten version.
+Dias is an ongoing research project by the [ADAPT group @ UIUC](https://github.com/ADAPT-uiuc). You can help us by sending us notebooks that you want to speed up and we will our best to make Dias do it automatically ([send us an email](mailto:sb54@illinois.edu) with either the notebook or Colab link)! Moreover, if you are aware of a pattern that can be rewritten to a faster version, please consider submitting an issue. You can use [our template](https://github.com/ADAPT-uiuc/dias/issues/new?assignees=&labels=pattern&template=pattern-request.md&title=%3CShort+description+of+the+original+and+the+rewritten%3E).
 
 We also welcome feedback from all backgrounds, including industry specialists, data analysts and academics. Please reach out to sb54@illinois.edu to share your opinion!
