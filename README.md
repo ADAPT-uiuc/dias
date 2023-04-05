@@ -38,7 +38,6 @@ The fastest way to get started is to play around with our [Quickstart Google Col
 
 ```python
 import pandas as pd
-import dias.rewriter
 import numpy as np
 rand_arr = np.random.rand(2_500_000,20)
 df = pd.DataFrame(rand_arr)
@@ -82,6 +81,8 @@ df.apply(weighted_rating, axis=1)
 
 ```python
 import pandas as pd
+# Import Dias. Keep everything 
+# else the same.
 import dias.rewriter
 import numpy as np
 rand_arr = np.random.rand(2_500_000,20)
@@ -99,8 +100,6 @@ df = pd.DataFrame(rand_arr)
 
 ```python
 %%time
-%%rewrite # Enable Dias.
-# The rest remains unchanged.
 def weighted_rating(x, m=50, C=5.6):
     v = x[0]
     R = x[9]
@@ -140,14 +139,12 @@ pip install dias
 
 ### Usage
 
-For the following instructions, be sure that you are in an IPython/Jupyter notebook environment.
+Make sure that you are using a Jupyter/IPython notebook.
 
-First import the package.
+First import the package... That's it!
 ```python
 import dias.rewriter
 ```
-
-Then, add `%%rewrite` at the beginning of every cell (see the example above).
 
 ### Examples
 
@@ -164,13 +161,13 @@ Dias' runtime overheads are minimal too. In [our experiments](https://baziotis.c
 
 Yes. Dias' output is standard Python code, and so, for example, you do not need to know anything about Dias to know why you got a speedup. Similarly, you can just copy Dias' output and use it as any other Python code.
 
-To inspect the rewritten version, use ``%%rewrite verbose``. See [this example](https://github.com/ADAPT-uiuc/dias/blob/main/examples/inspecting_output.ipynb).
+To inspect the rewritten version, add the comment `# DIAS_VERBOSE` at the beginning of your cell (right after any magic functions). See [this example](https://github.com/ADAPT-uiuc/dias/blob/main/examples/inspecting_output.ipynb).
 
 ### Is Dias a replacement for `pandas`?
 No (which inherently means Dias does not suffer from lack of API support). Dias is a rewriter, which inspects and possibly rewrites `pandas` code.
 
 ### Does Dias work with a standard Python interpreter?
-No. Dias depends on IPython's feature of [magic functions](https://ipython.readthedocs.io/en/stable/interactive/magics.html) to automatically rewrite code.
+No. Dias currently uses IPython features.
 
 ### When does Dias rewrite code?
 
