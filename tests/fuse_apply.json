@@ -1,2 +1,36 @@
-{"raw": "md['genres'] = md['genres'].fillna('[]').apply(literal_eval).apply(lambda x: [i['name'] for i in x] if isinstance(x, list) else []).head()\n",
-"modified": "def _REWR_fused_apply(_REWR_ser):\n    if type(_REWR_ser) == pd.Series:\n        _REWR_res = []\n        _REWR_ls = _REWR_ser.tolist()\n        for _REWR_it in _REWR_ls:\n            _REWR_left = literal_eval(_REWR_it)\n            _REWR_right = [i['name'] for i in _REWR_left] if isinstance(\n                _REWR_left, list) else []\n            _REWR_res.append(_REWR_right)\n        return pd.Series(_REWR_res)\n    else:\n        return _REWR_ser.apply(literal_eval).apply(lambda x: [i['name'] for\n            i in _REWR_left] if isinstance(_REWR_left, list) else [])\nmd['genres'] = _REWR_fused_apply(md['genres'].fillna('[]')).head()\n"},
+{
+  "cells":[
+    {
+      "raw":"\nmd = pd.read_csv('./datasets/rounakbanik__movie-recommender-systems__movies_metadata.csv', low_memory=False)\n",
+      "modified":"md = pd.read_csv(\n    './datasets/rounakbanik__movie-recommender-systems__movies_metadata.csv',\n    low_memory=False)\n",
+      "patts-hit":{
+        
+      },
+      "rewritten-exec-time":26.176412
+    },
+    {
+      "raw":"\n# Make copy for testing\nmd['copy'] = md['genres'].copy()\n",
+      "modified":"md['copy'] = md['genres'].copy()\n",
+      "patts-hit":{
+        
+      },
+      "rewritten-exec-time":0.581167
+    },
+    {
+      "raw":"\nmd['genres'] = md['genres'].fillna('[]').apply(literal_eval).apply(lambda x: [i['name'] for i in x] if isinstance(x, list) else []).head()\n",
+      "modified":"def _REWR_fused_apply(_REWR_ser):\n    if type(_REWR_ser) == pd.Series:\n        _REWR_res = []\n        _REWR_ls = _REWR_ser.tolist()\n        for _REWR_it in _REWR_ls:\n            _REWR_left = literal_eval(_REWR_it)\n            _REWR_right = [i['name'] for i in _REWR_left] if isinstance(\n                _REWR_left, list) else []\n            _REWR_res.append(_REWR_right)\n        return pd.Series(_REWR_res)\n    else:\n        return _REWR_ser.apply(literal_eval).apply(lambda x: [i['name'] for\n            i in _REWR_left] if isinstance(_REWR_left, list) else [])\nmd['genres'] = _REWR_fused_apply(md['genres'].fillna('[]')).head()\n",
+      "patts-hit":{
+        "FuseApply":1
+      },
+      "rewritten-exec-time":56.899022
+    },
+    {
+      "raw":"\nassert (md['defa'].dropna() == md['genres'].dropna()).all()\n",
+      "modified":"assert (md['defa'].dropna() == md['genres'].dropna()).all()\n",
+      "patts-hit":{
+        
+      },
+      "rewritten-exec-time":0.597228
+    }
+  ]
+}

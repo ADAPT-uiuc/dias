@@ -1,2 +1,36 @@
-{"raw": "lowest_df = train_df.sort_values('total_score').head(4)\n",
-"modified": "lowest_df = train_df.nsmallest(n=4, columns='total_score')\n"},
+{
+  "cells":[
+    {
+      "raw":"\ntrain_df = pd.read_csv('./datasets/lextoumbourou__feedback3-eda-hf-custom-trainer-sift__train.csv')\n",
+      "modified":"train_df = pd.read_csv(\n    './datasets/lextoumbourou__feedback3-eda-hf-custom-trainer-sift__train.csv'\n    )\n",
+      "patts-hit":{
+        
+      },
+      "rewritten-exec-time":54.001078
+    },
+    {
+      "raw":"\nLABEL_COLUMNS = ['cohesion', 'syntax', 'vocabulary', 'phraseology', 'grammar', 'conventions']\ntrain_df['total_score'] = train_df[LABEL_COLUMNS].sum(axis=1)\n",
+      "modified":"LABEL_COLUMNS = ['cohesion', 'syntax', 'vocabulary', 'phraseology',\n    'grammar', 'conventions']\ntrain_df['total_score'] = train_df[LABEL_COLUMNS].sum(axis=1)\n",
+      "patts-hit":{
+        
+      },
+      "rewritten-exec-time":1.077094
+    },
+    {
+      "raw":"\nour = train_df['total_score'].sort_values().head(4)\n",
+      "modified":"our = train_df['total_score'].nsmallest(n=4)\n",
+      "patts-hit":{
+        "SortHead":1
+      },
+      "rewritten-exec-time":0.754419
+    },
+    {
+      "raw":"\n# Convert to list so that we don't take account of the index. See correctness note above.\ncomp = [x == y for x, y in zip(our.tolist(), defa.tolist())]\nassert all(comp)\n",
+      "modified":"comp = [(x == y) for x, y in zip(our.tolist(), defa.tolist())]\nassert all(comp)\n",
+      "patts-hit":{
+        
+      },
+      "rewritten-exec-time":0.242363
+    }
+  ]
+}

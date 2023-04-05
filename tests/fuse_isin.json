@@ -1,2 +1,52 @@
-{"raw": "df_ea = df.loc[(df['Industry'].isin(env)) | (df['Industry'].isin(ai))].reset_index(drop=True,inplace=False)\n",
-  "modified": "df_ea = df.loc[df['Industry'].isin(env + ai)].reset_index(drop=True,\n    inplace=False)\n"},
+{
+  "cells":[
+    {
+      "raw":"\n# load & cleanup\nfile = './datasets/kkhandekar__environmental-vs-ai-startups-india-eda__Startup_Counts_Across_India.csv'\ndf = pd.read_csv(file)\n",
+      "modified":"file = (\n    './datasets/kkhandekar__environmental-vs-ai-startups-india-eda__Startup_Counts_Across_India.csv'\n    )\ndf = pd.read_csv(file)\n",
+      "patts-hit":{
+        
+      },
+      "rewritten-exec-time":3.83884
+    },
+    {
+      "raw":"\ndf.drop('S No.',axis=1,inplace=True)\ndf.dropna(inplace=True)\ndf.reset_index(inplace=True,drop=True)\n\n#view\ndf.head()\n",
+      "modified":"df.drop('S No.', axis=1, inplace=True)\ndf.dropna(inplace=True)\ndf.reset_index(inplace=True, drop=True)\ndf.head()\n",
+      "patts-hit":{
+        
+      },
+      "rewritten-exec-time":4.884942
+    },
+    {
+      "raw":"\n# Industry sub-categories for environmental & AI startups\nenv = ['Agriculture','Green Technology','Renewable Energy','Waste Management']\nai = ['AI','Robotics','Computer Vision']\n",
+      "modified":"env = ['Agriculture', 'Green Technology', 'Renewable Energy',\n    'Waste Management']\nai = ['AI', 'Robotics', 'Computer Vision']\n",
+      "patts-hit":{
+        
+      },
+      "rewritten-exec-time":0.175682
+    },
+    {
+      "raw":"\nour = df.loc[(df['Industry'].isin(env)) | (df['Industry'].isin(ai))].reset_index(drop=True,inplace=False)\n",
+      "modified":"our = df.loc[df['Industry'].isin(env + ai)].reset_index(drop=True, inplace=\n    False)\n",
+      "patts-hit":{
+        "FuseIsIn":1
+      },
+      "rewritten-exec-time":0.617078
+    },
+    {
+      "raw":"\ndefa = df.loc[(df['Industry'].isin(env)) | (df['Industry'].isin(ai))].reset_index(drop=True,inplace=False)\n",
+      "modified":"defa = df.loc[df['Industry'].isin(env + ai)].reset_index(drop=True, inplace\n    =False)\n",
+      "patts-hit":{
+        "FuseIsIn":1
+      },
+      "rewritten-exec-time":0.515106
+    },
+    {
+      "raw":"\nfor col in our.columns:\n    assert(our[col] == defa[col]).all()\n",
+      "modified":"for col in our.columns:\n    assert (our[col] == defa[col]).all()\n",
+      "patts-hit":{
+        
+      },
+      "rewritten-exec-time":0.694289
+    }
+  ]
+}

@@ -8,18 +8,11 @@ import dias.nb_utils as nb_utils
 to_test = sys.argv[1]
 correct = sys.argv[2]
 
-
-# TODO: That remained from earlier versions. I would love if someone
-# could modify the .json files
 def get_correct_json(file):
   assert file.endswith(".json")
   f = open(file, "r")
-  text = f.read()
-  # And newline...
-  remove_trailing_comma = text[:-2]
-  json_text = '{"cells": [' + remove_trailing_comma + "]}"
+  json_loaded = json.load(f)
   f.close()
-  json_loaded = json.loads(json_text)
   return json_loaded
 
 def get_to_test_json(file):

@@ -1376,28 +1376,22 @@ def rewrite_and_exec(cell_ast: ast.Module, ipython: InteractiveShell) -> Tuple[s
   return new_source, stats, time_spent_in_exec
 
 
-# Note: There are two types of magic functions. Line magic functions and cell magic functions.
-# A line magic function operates per line, like %load_ext or %timeit and they start with one %.
-# A cell magic function operates per cell, like %%time.
-#
-# To register a cell magic function, we put the @register_cell_magic above a function that takes
-# two arguments, line and cell. Because it's a cell magic function, only the `cell` param will be filled
-# by the caller. The name of the function is the name of the magic function that we use on the cell.
-# For example, here we write %%rewrite at the top of a cell.
-@register_cell_magic
+
+# In call_rewrite(), we modify the code such that it calls rewrite(). Inside
+# rewrite() we run code using ip.run_cell(). This function, however, calls the
+# cell transformers, and thus call_rewrite() again. This leads to infinite
+# recursion. We want to apply call_rewrite() only if the execution does _not_
+# originate from Dias itself. So, we use a global to track whether we reached
+# call_rewrite() from Dias.
+_inside_dias = False
+
+
 def rewrite(line: str, cell: str):
+  global _inside_dias
+  _inside_dias = True
+
   # TODO: Is this a good idea or we should ask it every time we want to use it?
   ipython = get_ipython()
-
-  # Skip magic functions
-  lines = cell.split('\n')
-  save_idx = -1
-  for idx, ln in enumerate(lines):
-    if not ln.strip().startswith('%%'):
-      save_idx = idx
-      break
-  assert save_idx != -1
-  cell = '\n'.join(lines[save_idx:])
 
   # Note: `cell` has the raw source code, but it doesn't include %%rewrite
   # dbg_print("--------- Original AST -----------")
@@ -1443,4 +1437,51 @@ def rewrite(line: str, cell: str):
     eprint(dumped_stats)
     eprint("[IREWRITE END JSON]")
 
+  _inside_dias = False
   return None
+
+def call_rewrite(lines: List[str]):
+  cell = ''.join(lines)
+  # IMPORTANT: This second check can be very slow but we need a lot of code.
+  if _inside_dias or "dias.rewriter.rewrite" in cell:
+    return lines
+
+  # Skip magic functions (i.e., find the line that doesn't start with %%)
+  save_idx = -1
+  for idx, ln in enumerate(lines):
+    if not ln.strip().startswith('%%'):
+      save_idx = idx
+      break
+  assert save_idx != -1
+  assert save_idx < len(lines)
+  # Check if the line right after the magics has the DIAS_VERBOSE or DIAS_DISABLE
+  verbose = ""
+  disable = False
+  first_non_magic = lines[save_idx]
+  if first_non_magic.startswith("#"):
+    if "DIAS_VERBOSE" in first_non_magic:
+      verbose = "verbose"
+    elif "DIAS_DISABLE" in first_non_magic:
+      disable = True
+
+  if disable:
+    # Just return the original immediately
+    return lines
+  magics = lines[:save_idx]
+  cell = ''.join(lines[save_idx:])
+
+  # Escape it because it may contain triple quotes.
+  cell = cell.replace('"""', '\\"\\"\\"')
+  # Make the code call rewrite()
+  new_cell = f"""
+dias.rewriter.rewrite("{verbose}",
+\"\"\"
+{cell}\"\"\")
+"""
+
+  # Leave the magics untouched.
+  res = magics + [new_cell]
+  return res
+
+ip = get_ipython()
+ip.input_transformers_cleanup.append(call_rewrite)

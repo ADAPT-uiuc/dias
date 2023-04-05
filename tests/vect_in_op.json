@@ -1,2 +1,36 @@
-{"raw": "our = df.apply(set_feature, axis=1)\n",
-"modified": "our = np.select([df['Cabin'].isin(cabins1) | df['Cabin'].isin(cabins2)], [\n    True], default=False)\n"},
+{
+  "cells":[
+    {
+      "raw":"\ndf = pd.read_csv('titanic.csv')\n",
+      "modified":"df = pd.read_csv('titanic.csv')\n",
+      "patts-hit":{
+        
+      },
+      "rewritten-exec-time":2.343171
+    },
+    {
+      "raw":"\ncabins1 = ['C123', 'C148', 'C85']\ncabins2 = ['B42']\ndef set_feature(row):\n    # NOTE: We know that since we check that the body of function is an if-chain\n    # with only returns, then the list (here `cabins`) cannot be defined inside\n    # the function. That would be a problem because we would have to move it outside.\n    if row['Cabin'] in cabins1 or row['Cabin'] in cabins2:\n        return True\n    else:\n        return False\n",
+      "modified":"cabins1 = ['C123', 'C148', 'C85']\ncabins2 = ['B42']\ndef set_feature(row):\n    if row['Cabin'] in cabins1 or row['Cabin'] in cabins2:\n        return True\n    else:\n        return False\n",
+      "patts-hit":{
+        
+      },
+      "rewritten-exec-time":0.318815
+    },
+    {
+      "raw":"\nour = df.apply(set_feature, axis=1)\n",
+      "modified":"our = np.select([df['Cabin'].isin(cabins1) | df['Cabin'].isin(cabins2)], [\n    True], default=False)\n",
+      "patts-hit":{
+        "ApplyVectorized":1
+      },
+      "rewritten-exec-time":0.645068
+    },
+    {
+      "raw":"\nassert (defa == our).all()\n",
+      "modified":"assert (defa == our).all()\n",
+      "patts-hit":{
+        
+      },
+      "rewritten-exec-time":0.287004
+    }
+  ]
+}

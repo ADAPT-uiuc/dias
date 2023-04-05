@@ -1,2 +1,20 @@
-{"raw": "for col in df.columns:\n    if '12 ' in df[col].to_string():\n        pass\n",
-"modified": "for col in df.columns:\n    if '12 ' in df[col].to_string():\n        pass\n"},
+{
+  "cells":[
+    {
+      "raw":"\ndf = pd.read_csv('./datasets/dataranch__supermarket-sales-prediction-xgboost-fastai__SampleSuperstore.csv')\n",
+      "modified":"df = pd.read_csv(\n    './datasets/dataranch__supermarket-sales-prediction-xgboost-fastai__SampleSuperstore.csv'\n    )\n",
+      "patts-hit":{
+        
+      },
+      "rewritten-exec-time":10.484158
+    },
+    {
+      "raw":"\nfor col in df.columns:\n    if '12 ' in df[col].to_string():\n        pass\n",
+      "modified":"for col in df.columns:\n    if '12 ' in df[col].to_string():\n        pass\n",
+      "patts-hit":{
+        
+      },
+      "rewritten-exec-time":401.091066
+    }
+  ]
+}

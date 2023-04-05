@@ -1,2 +1,36 @@
-{"raw": "our = df.apply(set_feature, axis=1)\n",
-"modified": "our = np.select([(df['Pclass'] == 1) & (df['Survived'] == 1), df['Age'] > \n    30], [df['PassengerId'], True], default=df['Sex'])\n"},
+{
+  "cells":[
+    {
+      "raw":"\ndf = pd.read_csv('titanic.csv')\n",
+      "modified":"df = pd.read_csv('titanic.csv')\n",
+      "patts-hit":{
+        
+      },
+      "rewritten-exec-time":2.2763
+    },
+    {
+      "raw":"\ndef set_feature(row):\n    if row['Pclass'] == 1 and row['Survived'] == 1:\n        return row['PassengerId']\n    elif row['Age'] > 30:\n        return True\n    else:\n        return row['Sex']\n",
+      "modified":"def set_feature(row):\n    if row['Pclass'] == 1 and row['Survived'] == 1:\n        return row['PassengerId']\n    elif row['Age'] > 30:\n        return True\n    else:\n        return row['Sex']\n",
+      "patts-hit":{
+        
+      },
+      "rewritten-exec-time":0.291074
+    },
+    {
+      "raw":"\nour = df.apply(set_feature, axis=1)\n",
+      "modified":"our = np.select([(df['Pclass'] == 1) & (df['Survived'] == 1), df['Age'] > \n    30], [df['PassengerId'], True], default=df['Sex'])\n",
+      "patts-hit":{
+        "ApplyVectorized":1
+      },
+      "rewritten-exec-time":0.750789
+    },
+    {
+      "raw":"\nassert (defa == our).all()\n",
+      "modified":"assert (defa == our).all()\n",
+      "patts-hit":{
+        
+      },
+      "rewritten-exec-time":0.328635
+    }
+  ]
+}

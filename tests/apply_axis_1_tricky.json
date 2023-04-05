@@ -1,6 +1,44 @@
-{"raw": "df = pd.read_csv('titanic.csv')\n",
-"modified": "df = pd.read_csv('titanic.csv')\n"},
-{"raw": "our = df.apply(foo, axis=1)\n",
-"modified": "our = df.apply(foo, axis=1)\n"},
-{"raw": "our = df.apply(bar, axis=1)\n",
-"modified": "our = df.apply(bar, axis=1)\n"},
+{
+  "cells":[
+    {
+      "raw":"\ndf = pd.read_csv('titanic.csv')\n",
+      "modified":"df = pd.read_csv('titanic.csv')\n",
+      "patts-hit":{
+        
+      },
+      "rewritten-exec-time":2.3051
+    },
+    {
+      "raw":"\ndef foo(row):\n    if row['Fare'] > 10:\n        return True\n    copy = row\n    return False\n",
+      "modified":"def foo(row):\n    if row['Fare'] > 10:\n        return True\n    copy = row\n    return False\n",
+      "patts-hit":{
+        
+      },
+      "rewritten-exec-time":0.215183
+    },
+    {
+      "raw":"\nour = df.apply(foo, axis=1)\n",
+      "modified":"our = df.apply(foo, axis=1)\n",
+      "patts-hit":{
+        
+      },
+      "rewritten-exec-time":3.04458
+    },
+    {
+      "raw":"\ndef bar(row):\n    if row['Fare'] > 10:\n        return True\n    copy = row\n    if copy['Survived'] == 1:\n        return True\n    return False\n",
+      "modified":"def bar(row):\n    if row['Fare'] > 10:\n        return True\n    copy = row\n    if copy['Survived'] == 1:\n        return True\n    return False\n",
+      "patts-hit":{
+        
+      },
+      "rewritten-exec-time":0.263644
+    },
+    {
+      "raw":"\nour = df.apply(bar, axis=1)\n",
+      "modified":"our = df.apply(bar, axis=1)\n",
+      "patts-hit":{
+        
+      },
+      "rewritten-exec-time":3.221631
+    }
+  ]
+}

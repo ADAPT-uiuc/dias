@@ -1,2 +1,0 @@
-{"raw": "s = md.apply(lambda x: pd.Series(x['genres']),axis=1).stack().reset_index(level=1, drop=True)\n",
-"modified": "s = md['genres'].apply(lambda x: pd.Series(x)).stack().reset_index(level=1,\n    drop=True)\n"},
