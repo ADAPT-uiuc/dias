@@ -773,50 +773,45 @@ class RemoveAxis1Lambda:
     self.the_one_series = the_one_series
 
 def can_remove_axis_1(tree: ast.AST, arg0_name: str) -> Tuple[bool, str]:
-  # Check that all the times the row_name appears, it is in a subscript
-  # and check that all these subscripts the same Series.
+  # Check that all the times the arg0_name appears, it is in a subscript
+  # and check that all these subscripts access the same Series.
   # NOTE: If we have other subscripts, on different names, then
   # we don't care about those.
   
-  only_one_series = True
-  # Be careful if you try to use Set[CompatSub]. These are objects
-  # and Python may miscount two "equal" CompatSub's as the same.
-  seen_subs: Dict[str, CompatSub] = dict()
+  the_one_series = None
 
-  # Parents of subs and the attribute to access the sub.
+  # This loop is complicated because what we would like to do is to loop through
+  # all Names and check if their encloser is a CompatSub. But, we can't get the
+  # parent of a node. So, instead,we need to loop through all nodes and search
+  # for enclosed Names.
   for n in ast.walk(tree):
-    if len(seen_subs.keys()) > 1:
-      only_one_series = False
-      break
+    # NOTE: We don't want to allow appearances of arg0_name that is not in a
+    # CompatSub. A Name can't appear on its own, i.e., without an encloser.
+    # It will have to be at least inside an Expr. So, we are checking
+    # the above because we check that the encloser is a CompatSub
     names = search_enclosed(n, ast.Name)
     for enclosed_name in names:
       name = enclosed_name.get_obj()
-      if len(seen_subs.keys()) > 1:
-        only_one_series = False
-        break
       assert isinstance(name, ast.Name)
       if name.id == arg0_name:
         sub = enclosed_name.get_encloser()
-        if not isinstance(sub, ast.Subscript):
-          only_one_series = False
-          break
-        compat_sub = is_compatible_sub(sub)
+        compat_sub = is_compatible_sub_unkn(sub)
         if compat_sub is None:
-          only_one_series = False
-          break
-        seen_subs[compat_sub.get_Series()] = compat_sub
-      if only_one_series == False:
-        break
-# -- END OF LOOP --
+          return False, ""
+        if arg0_name != compat_sub.get_df():
+          return False, ""
+        the_series = compat_sub.get_Series()
+        if (the_one_series is not None and
+            the_one_series != the_series):
+          return False, ""
+        the_one_series = the_series
+    # END INNER LOOP #
+  # -- END OUTER LOOP --
 
   # TODO: Can we handle no sub? My samples show that it doesn't
   # exist.
-  if len(seen_subs.keys()) != 1:
+  if the_one_series is None:
     return False, ""
-  if not only_one_series:
-    return False, ""
-  the_one_compat_sub = seen_subs[[k for k in seen_subs.keys()][0]]
-  the_one_series = the_one_compat_sub.get_Series()
   return True, the_one_series
 
 def is_remove_axis_1(apply_call: ApplyOrMap) -> Optional[Union[RemoveAxis1, RemoveAxis1Lambda]]:
