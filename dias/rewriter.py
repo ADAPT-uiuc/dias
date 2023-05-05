@@ -308,6 +308,12 @@ def has_only_math__preconds(called_on: ast.AST,
     else:
       return False
   # Check that all external names used are of numeric type.
+  for ext in external_names:
+    ext_obj = ipython.user_ns[ext]
+    if not has_only_math__numeric_ty(type(ext_obj)):
+      return False
+  # END OF LOOP #
+
   # Check that all the Series accessed are numeric
   dtypes = the_df.dtypes
   for sub in subs:

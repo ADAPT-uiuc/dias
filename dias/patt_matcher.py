@@ -1729,8 +1729,6 @@ def has_only_math(func_ast: ast.FunctionDef, args: List[str], subs: List[str], e
     if len(stmt.targets) != 1:
       return False
     lhs = stmt.targets[0]
-    # The LHS should be Name that is not in the arguments
-    # (to avoid weird Python trickery)
     if not isinstance(lhs, ast.Name):
       return False
     introduced_names.add(lhs.id)
