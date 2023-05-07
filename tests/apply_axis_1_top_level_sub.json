@@ -1,0 +1,20 @@
+{
+  "cells":[
+    {
+      "raw":"\ndf = pd.DataFrame({'A': [1, 2], 'B': [3, 4]})\n",
+      "modified":"df = pd.DataFrame({'A': [1, 2], 'B': [3, 4]})\n",
+      "patts-hit":{
+        
+      },
+      "rewritten-exec-time":0.502257
+    },
+    {
+      "raw":"\n# Top-level subscript in the body that we're checking. This needs special\n# checking in the rewriter.\ndf.apply(lambda row: row['A'], axis=1)\n",
+      "modified":"df['A'].apply(lambda row: row)\n",
+      "patts-hit":{
+        "RemoveAxis1Lambda":1
+      },
+      "rewritten-exec-time":1.338207
+    }
+  ]
+}

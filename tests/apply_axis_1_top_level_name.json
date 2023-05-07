@@ -1,0 +1,20 @@
+{
+  "cells":[
+    {
+      "raw":"\ndf = pd.DataFrame({'A': [1, 2], 'B': [3, 4]})\n",
+      "modified":"df = pd.DataFrame({'A': [1, 2], 'B': [3, 4]})\n",
+      "patts-hit":{
+        
+      },
+      "rewritten-exec-time":0.521346
+    },
+    {
+      "raw":"\n# Top-level name in the body that we're checking. This needs special\n# checking in the pattern matcher.\ndf.apply(lambda row: row, axis=1)\n",
+      "modified":"df.apply(lambda row: row, axis=1)\n",
+      "patts-hit":{
+        
+      },
+      "rewritten-exec-time":3.429633
+    }
+  ]
+}

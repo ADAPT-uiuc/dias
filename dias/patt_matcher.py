@@ -782,8 +782,13 @@ def can_remove_axis_1(tree: ast.AST, arg0_name: str) -> Tuple[bool, str]:
 
   # This loop is complicated because what we would like to do is to loop through
   # all Names and check if their encloser is a CompatSub. But, we can't get the
-  # parent of a node. So, instead,we need to loop through all nodes and search
+  # parent of a node. So, instead, we need to loop through all nodes and search
   # for enclosed Names.
+  # We need to handle the special case where the Name is the top-level node in
+  # the body. That can happen e.g., here: df.apply(lambda row: row, axis=1)
+  if isinstance(tree, ast.Name):
+    return False, ""
+
   for n in ast.walk(tree):
     # NOTE: We don't want to allow appearances of arg0_name that is not in a
     # CompatSub. A Name can't appear on its own, i.e., without an encloser.

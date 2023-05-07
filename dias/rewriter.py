@@ -1230,19 +1230,34 @@ def rewrite_and_exec(cell_ast: ast.Module, ipython: InteractiveShell) -> Tuple[s
       attr_ast = patt.call_name.attr_call.get_attr_ast()
       attr_ast.value = \
         AST_sub_const(AST_name(patt.call_name.get_name()), patt.the_one_series)
-      # Modify all the subscripts in the function.
+      
       arg0_name = patt.lam.args.args[0].arg
+
+      # Modify all the subscripts in the function. To do that, we need access
+      # to the parent of the subscript. However, we can't do that so we have
+      # to search for enclosed objects. We need to handle the special
+      # case where the subscript is top-level. This can happen e.g., here:
+      #   df.apply(lambda row: row['A'], axis=1)
+
+      def rewrite_enclosed_sub(enclosed_sub):
+        sub = enclosed_sub.get_obj()
+        compat_sub = patt_matcher.is_compatible_sub(sub)
+        if compat_sub is None:
+          return
+        if (compat_sub.get_Series() == patt.the_one_series and
+            compat_sub.get_df() == arg0_name):
+          enclosed_sub.set_enclosed_obj(AST_name(arg0_name))
+      # END OF FUNCTION #
+
+      if isinstance(patt.lam.body, ast.Subscript):
+        enclosed_sub = patt_matcher.get_enclosed_attr(patt.lam, "body")
+        rewrite_enclosed_sub(enclosed_sub)
+
       for n in ast.walk(patt.lam.body):
         subs = patt_matcher.search_enclosed(n, ast.Subscript)
         for enclosed_sub in subs:
-          sub = enclosed_sub.get_obj()
-          compat_sub = patt_matcher.is_compatible_sub(sub)
-          if compat_sub is None:
-            continue
-          if (compat_sub.get_Series() == patt.the_one_series and
-              compat_sub.get_df() == arg0_name):
-            enclosed_sub.set_enclosed_obj(AST_name(arg0_name))
-      
+          rewrite_enclosed_sub(enclosed_sub)
+
       stats[type(patt).__name__] = 1
     elif isinstance(patt, patt_matcher.FuseApply):
       assert len(stmt_idxs) == 1
