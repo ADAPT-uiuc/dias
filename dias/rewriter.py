@@ -27,10 +27,6 @@ _IREWR_JSON_STATS=False
 if "_IREWR_JSON_STATS" in os.environ and os.environ["_IREWR_JSON_STATS"] == "True":
   _IREWR_JSON_STATS=True
 
-_IREWR_DISABLE_SLICED_EXEC=False
-if "_IREWR_DISABLE_SLICED_EXEC" in os.environ and os.environ["_IREWR_DISABLE_SLICED_EXEC"] == "True":
-  _IREWR_DISABLE_SLICED_EXEC=True
-
 disabled_patts = set()
 if "_IREWR_DISABLED_PATTS" in os.environ:
   disabled_patts = ast.literal_eval(os.environ["_IREWR_DISABLED_PATTS"])
@@ -601,70 +597,13 @@ def vec__build_np_select(cond_value_pairs, else_val):
       keywords={'default': else_val[0]})
   return np_select
 
-def sliced_execution(list_of_lists: List[List[ast.stmt]],
-                     ipython: InteractiveShell,
-                     deferred_patts: Dict[ast.stmt, List[Tuple[patt_matcher.Available_Patterns, List[int]]]],
-                     stats: dict()):
-  time_spent_in_exec = 0
-
-  new_source = ""
-  curr_idx = 0
-  while curr_idx < len(list_of_lists):
-    # Build the code slice that is not blocked by a statement.
-    code_slice = ""
-    while curr_idx < len(list_of_lists) and list_of_lists[curr_idx][0] not in deferred_patts:
-      stmt_list = list_of_lists[curr_idx]
-      for stmt in stmt_list:
-        code_slice = code_slice + astor.to_source(stmt)
-      curr_idx = curr_idx + 1
-
-    new_source = new_source + code_slice
-    if curr_idx == len(list_of_lists):
-      # That was the last slice. Execute it and exit.
-      start = time.perf_counter_ns()
-      ipython.run_cell(code_slice)
-      end = time.perf_counter_ns()
-      time_spent_in_exec = time_spent_in_exec + (end-start)
-      break
-    
-    # Execute the slice
-    start = time.perf_counter_ns()
-    ipython.run_cell(code_slice)
-    end = time.perf_counter_ns()
-    time_spent_in_exec = time_spent_in_exec + (end-start)
-    
-    # Deal with the blocking statement.
-    blocking_stmt = list_of_lists[curr_idx][0]
-    assert blocking_stmt in deferred_patts
-    ls_of_patts = deferred_patts[blocking_stmt]
-    for patt, stmt_idxs in ls_of_patts:
-      if isinstance(patt, patt_matcher.ApplyCallMaybeRemoveAxis1):
-        func_to_call = patt.apply_call.get_func_to_call()
-        called_on = patt.apply_call.call_name.attr_call.get_called_on()
-        func_ast, arg0_name = get_func_ast_and_arg_name(func_to_call, ipython)
-        all_arg_names = [arg.arg for arg in func_ast.args.args]
-        buf_list = []
-        buf_set = set()
-
-        stmt_source = astor.to_source(blocking_stmt)
-        start = time.perf_counter_ns()
-        ipython.run_cell(stmt_source)
-        end = time.perf_counter_ns()
-        time_spent_in_exec = time_spent_in_exec + (end-start)
-        new_source = new_source + stmt_source
-      else:
-        # It must be a specific pattern
-        assert 0
-    # END: for patt, stmt_idxs ...
-    curr_idx = curr_idx + 1
-  # END: while curr_idx < len(list_of_lists):
-  return new_source, stats, time_spent_in_exec
-
 # I don't think we can declare a type for `ipython`
 def rewrite_and_exec(cell_ast: ast.Module, ipython: InteractiveShell) -> Tuple[str, Dict, Dict]:
   assert isinstance(cell_ast, ast.Module)
   body = cell_ast.body
   matched_patts = patt_matcher.patt_match(body)
+
+  # TODO: We may be able to simplify the following not that sliced execution is gone.
 
   ##############
   # Currently, the pattern-matcher returns a list of patterns, and for each
@@ -714,29 +653,6 @@ def rewrite_and_exec(cell_ast: ast.Module, ipython: InteractiveShell) -> Tuple[s
   #   or modify other statements. That would work because you may modify one of the statements
   #   of another pattern that has been not processed yet. Basically, this con is another
   #   way of highlighting the fact that the rewrites have to be context-sensitive.
-  #
-  # And now, to go to my final point, generally I don't think that we will have context-sensitive
-  # patterns _in terms of code_. So, some patterns will be context-sensitive. For example,
-  # the ApplyAxis1 needs to know the code of the function. And maybe the function is defined
-  # or re-defined in the same cell. But, I think that if you start basing your rewrites
-  # on static analysis, you will fail fast because of the craziness of Python. Rather,
-  # I think we should base ourselves on runtime checks. For example, for ApplyAxis1, we should
-  # execute all the code up to this point, then get the code of the function object passed
-  # to apply(). And that's why I don't think it's worth worrying about the order of patterns.
-  #
-  # What we should have though is the concept of "deferred" patterns. These are patterns
-  # that require all the code to have been executed up to a statement, before the can be processed.
-  # So, we then slice the body on these deferred statements and we proceed as follows: execute a slice,
-  # process the deferred pattern, execute next slice, process the other deferred pattern etc.
-
-  # For each statement, save a list of patterns that can be executed only after the statement is
-  # executed.
-  deferred_patts: Dict[ast.stmt, List[Tuple[patt_matcher.Available_Patterns, List[int]]]] = dict()
-
-  #
-  # First, execute all the context-insensitive patterns (read above; those that do not need
-  # to be deferred) and gather the deferred ones.
-  #
 
   ##############
   # The patterns can't operate trivially over `body` (i.e., add things to it in the middle etc.)
@@ -879,20 +795,6 @@ def rewrite_and_exec(cell_ast: ast.Module, ipython: InteractiveShell) -> Tuple[s
       astor.to_source(patt.head.call.get_obj())
 
       stats[type(patt).__name__] = 1
-    elif isinstance(patt, patt_matcher.ApplyCallMaybeRemoveAxis1):
-      # We can't process it until we know the function passed to apply().
-      # Save it as a deferred pattern.
-      assert len(stmt_idxs) == 1
-      stmt_idx = stmt_idxs[0]
-      stmt_list = list_of_lists[stmt_idx]
-      stmt = stmt_list[0]
-
-      if stmt not in deferred_patts:
-        deferred_patts[stmt] = []
-      deferred_patts[stmt].append((patt, stmt_idxs))
-
-      # Don't log it into the stats here. Only if we apply it when processing
-      # deferred stmts.
     elif isinstance(patt, patt_matcher.ReplaceRemoveList):
       # We can't process it until we know the function passed to apply().
       # Save it as a deferred pattern.
@@ -1410,13 +1312,7 @@ def rewrite_and_exec(cell_ast: ast.Module, ipython: InteractiveShell) -> Tuple[s
     else:
       # No matched pattern, don't change stmt
       pass
-  # Now, start interleaving execution and rewrites.
 
-  if not _IREWR_DISABLE_SLICED_EXEC:
-    return sliced_execution(list_of_lists, ipython, deferred_patts, stats)
-
-  # Don't slice the execution. Just execute all the statements.
-  # TODO: It seems this would be faster with some list comprehension.
   new_source = ""
   for stmt_list in list_of_lists:
     for stmt in stmt_list:
