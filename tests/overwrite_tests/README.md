@@ -1,0 +1,3 @@
+Here I have tests for the cases where we overwrite a pandas function (e.g., `apply()`) and we don't rewrite externally. For now, we can't test these with the same infrastructure
+because the main rewriting routine does not know the cell is modified internally (and so, we can't set the `modified` field in JSON). So, currently these tests are only observational
+(i.e., we just test that the rewritten and the original version have the same output) and we don't test the rewritten code.

@@ -4,13 +4,16 @@ from IPython.display import display, Markdown
 import ast
 import os
 import sys
-from typing import Dict, List, Union, Optional, Tuple, Any, Set
+from typing import Dict, List, Union, Optional, Tuple, Any, Set, Literal
 import pickle
 import inspect
 import json
 import time
 import pandas as pd
 import numpy as np
+import functools
+
+from pandas._typing import AggFuncType, Axis
 
 ### NON-DEFAULT PACKAGES: The user has to have these installed
 import astor
@@ -189,6 +192,67 @@ def AST_function_def(name: str, args: List[str], body: List[ast.stmt]) -> ast.Fu
 
 ############ REWRITERS ############
 
+## apply() overwrite ##
+_DIAS_save_pandas_apply = pd.DataFrame.apply
+def _DIAS_apply(self, func: AggFuncType, axis: Axis = 0, raw: bool = False, 
+                result_type: Literal["expand", "reduce", "broadcast"] | None = None,
+                args=(), **kwargs):
+  # print("Called from Dias")
+
+  default = functools.partial(_DIAS_save_pandas_apply, self, func, axis, raw, result_type, args, **kwargs)
+  
+  # If any of the args after `axis` is not the default, bail.
+  if raw != False or result_type != None:
+    return default()
+  
+  # Only axis=1.
+  # TODO: We may be able to relax this for the vectorization pattern.
+  if axis != 1:
+    return default()
+  
+  func_source = inspect.getsource(func)
+  mod_ast = ast.parse(func_source)
+  func_ast = mod_ast.body[0]
+  # If it's not a FunctionDef, we bail out because Python is weird.
+  # In particular, we don't handle Lambdas here because it would
+  # be too hair and unreliable. See this: http://xion.io/post/code/python-get-lambda-code.html
+  # These are handled with RemoveAxis1Lambda pattern.
+  if not isinstance(func_ast, ast.FunctionDef):
+    return default()
+
+  # Either we have one argument or if we have more, they
+  # should have default values.
+  args_ok = (len(func_ast.args.args) == 1 or 
+             len(func_ast.args.defaults) == (len(func_ast.args.args) - 1))
+  if not args_ok:
+    return default()
+  arg0_name = func_ast.args.args[0].arg
+  can_remove, the_one_series = patt_matcher.can_remove_axis_1(func_ast, arg0_name)
+  if not can_remove:
+    return default()
+  # Rewrite all the subscripts in the function (it's in-place)  
+  rewrite_subscripts(func_ast, arg0_name, the_one_series)
+
+  # We change the name of the function, basically generating a new function,
+  # because we don't want to overwrite the old one.
+  new_func_name = get_unique_id()
+  func_ast.name = new_func_name
+  new_func_obj = compile(mod_ast, filename="<ast>", mode="exec")
+  # It's important to provide the correct namespace here
+  ip = get_ipython()
+  exec(new_func_obj, ip.user_ns)
+  # We must not recurse. We're calling the apply() of a Series so we should
+  # not recurse.
+  assert self[the_one_series].apply != _DIAS_apply
+  return self[the_one_series].apply(ip.user_ns[new_func_name])
+
+# IMPORTANT: How do we measure the rewriter's time and all that?
+# IMPORTANT: If we import it twice, this will be a problem
+assert pd.DataFrame.apply != _DIAS_apply
+# Overwriting is not trivial. Thanks to:
+# https://github.com/lux-org/lux/blob/550a2eca90b26c944ebe8600df7a51907bc851be/lux/core/__init__.py#L27
+pd.DataFrame.apply = pd.core.frame.DataFrame.apply = _DIAS_apply
+
 # If `name` exists in the current IPython namespace, check that
 # its type is DataFrame
 def check_DataFrame(name: str, ipython) -> bool:
@@ -224,50 +288,30 @@ def get_func_ast_and_arg_name(func_name: str, ipython: InteractiveShell) -> Tupl
   arg0_name = func_ast.args.args[0].arg
   return func_ast, arg0_name
 
-def rewrite_remove_axis_1(remove_axis_1: patt_matcher.RemoveAxis1, 
-                          func_ast: ast.FunctionDef, arg0_name: str,
-                          the_one_series: str) -> str:
-  # All the following modify `blocking_stmt`
-  # implicitly
-  # Remove axis=1
-  call = remove_axis_1.apply_call.call_name.attr_call.call.get_obj()
-  kwargs = call.keywords
-  axis_1_idx = -1
-  for idx, kw in enumerate(kwargs):
-    if kw.arg == "axis":
-      axis_1_idx = idx
-      break
-  assert axis_1_idx != -1
-  call.keywords.pop(axis_1_idx)
-  # Make row.apply -> row[Name].apply
-  call_name = remove_axis_1.apply_call.call_name
-  attr_ast = call_name.attr_call.get_attr_ast()
-  attr_ast.value = AST_sub_const(AST_name(call_name.get_name()), the_one_series)
-  # Modify all the subscripts in the function.
-  # Unfortunately, we have to do another walk here
-  # TODO: Find a way to fix that because it looks horrible.
-  # I tried saving the parent of `n` before next iteration of ast.walk()
-  # But ast.walk() does not tell which attribute it uses to visit the note.
-  # astor may be able to help with that by inserting code that is executed
-  # before children are visited: https://astor.readthedocs.io/en/latest/
-  for n in ast.walk(func_ast):
+def rewrite_enclosed_sub(enclosed_sub, arg0_name, the_one_series):
+  sub = enclosed_sub.get_obj()
+  compat_sub = patt_matcher.is_compatible_sub(sub)
+  if compat_sub is None:
+    return
+  if (compat_sub.get_Series() == the_one_series and
+      compat_sub.get_df() == arg0_name):
+    name_node = AST_name(arg0_name)
+    # We need to set these because this is passed to compile()
+    # and for some reason it needs them.
+    name_node.lineno = sub.lineno
+    name_node.col_offset = sub.col_offset
+    name_node.ctx = sub.ctx
+    enclosed_sub.set_enclosed_obj(name_node)
+# END OF FUNCTION #
+
+def rewrite_subscripts(func_body, arg0_name, the_one_series):
+  # Modify all the subscripts in the function. To do that, we need access
+  # to the parent of the subscript. However, we can't do that so we have
+  # to search for enclosed objects. 
+  for n in ast.walk(func_body):
     subs = patt_matcher.search_enclosed(n, ast.Subscript)
     for enclosed_sub in subs:
-      sub = enclosed_sub.get_obj()
-      compat_sub = patt_matcher.is_compatible_sub(sub)
-      if compat_sub is None:
-        continue
-      if (compat_sub.get_Series() == the_one_series and
-          compat_sub.get_df() == arg0_name):
-        enclosed_sub.set_enclosed_obj(ast.Name(id=arg0_name))
-
-  # Change the function name
-  new_func_name = get_unique_id()
-  func_ast.name = new_func_name
-  new_func_source = astor.to_source(func_ast)
-  call_name.attr_call.call.get_obj().args[0] = ast.Name(id=new_func_name)
-
-  return new_func_source
+      rewrite_enclosed_sub(enclosed_sub, arg0_name, the_one_series)
 
 def has_only_math__numeric_ty(ty) -> bool:
   numeric_types = {int, float, np.int64, np.float64}
@@ -278,7 +322,6 @@ def has_only_math__numeric_ty(ty) -> bool:
     if ty == num_dt:
       return True
   return False
-
 
 def has_only_math__preconds(called_on: ast.AST,
                             default_args: List[ast.expr], subs: List[str],
@@ -580,17 +623,6 @@ def sliced_execution(list_of_lists: List[List[ast.stmt]],
               AST_call(func=AST_name(func_ast.name), args=[AST_name(the_series.id)])
             )
             stats["ApplyOnlyMath"] = 1
-        elif patt.get_kind() == patt_matcher.ApplyCallMaybeRemoveAxis1.Kind.REMOVE_AXIS_1:
-          remove_axis_1 = patt.get_remove_axis_1()
-          passed_checks, the_one_series = patt_matcher.can_remove_axis_1(func_ast, arg0_name)
-          if passed_checks:
-            new_func_source = rewrite_remove_axis_1(remove_axis_1, func_ast, arg0_name, the_one_series)
-            stats["RemovedAxis1"] = 1
-            start = time.perf_counter_ns()
-            ipython.run_cell(new_func_source)
-            end = time.perf_counter_ns()
-            time_spent_in_exec = time_spent_in_exec + (end-start)
-            new_source = new_source + new_func_source
         else:
           # Don't do anything
           pass
@@ -1233,30 +1265,13 @@ def rewrite_and_exec(cell_ast: ast.Module, ipython: InteractiveShell) -> Tuple[s
       
       arg0_name = patt.lam.args.args[0].arg
 
-      # Modify all the subscripts in the function. To do that, we need access
-      # to the parent of the subscript. However, we can't do that so we have
-      # to search for enclosed objects. We need to handle the special
+      # Rewrite all subscripts. We need to handle the special
       # case where the subscript is top-level. This can happen e.g., here:
       #   df.apply(lambda row: row['A'], axis=1)
-
-      def rewrite_enclosed_sub(enclosed_sub):
-        sub = enclosed_sub.get_obj()
-        compat_sub = patt_matcher.is_compatible_sub(sub)
-        if compat_sub is None:
-          return
-        if (compat_sub.get_Series() == patt.the_one_series and
-            compat_sub.get_df() == arg0_name):
-          enclosed_sub.set_enclosed_obj(AST_name(arg0_name))
-      # END OF FUNCTION #
-
       if isinstance(patt.lam.body, ast.Subscript):
         enclosed_sub = patt_matcher.get_enclosed_attr(patt.lam, "body")
-        rewrite_enclosed_sub(enclosed_sub)
-
-      for n in ast.walk(patt.lam.body):
-        subs = patt_matcher.search_enclosed(n, ast.Subscript)
-        for enclosed_sub in subs:
-          rewrite_enclosed_sub(enclosed_sub)
+        rewrite_enclosed_sub(enclosed_sub, arg0_name, patt.the_one_series)
+      rewrite_subscripts(patt.lam.body, arg0_name, patt.the_one_series)
 
       stats[type(patt).__name__] = 1
     elif isinstance(patt, patt_matcher.FuseApply):
@@ -1482,6 +1497,8 @@ def call_rewrite(lines: List[str]):
   if first_non_magic.startswith("#"):
     if "DIAS_VERBOSE" in first_non_magic:
       verbose = "verbose"
+    # TODO: Remove this because in the case of apply() patterns it won't
+    # be disabled because these are overwritten globally.
     elif "DIAS_DISABLE" in first_non_magic:
       disable = True
 

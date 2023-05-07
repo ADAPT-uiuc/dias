@@ -23,3 +23,6 @@ for ipynb_file in *.ipynb; do
 done
 # Remove tmp.json if it exists
 [ -e tmp.json ] && rm tmp.json
+
+cd overwrite_tests
+./run_overwrite_tests.sh
