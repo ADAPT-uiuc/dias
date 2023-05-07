@@ -214,8 +214,6 @@ _DIAS_save_pandas_apply = pd.DataFrame.apply
 def _DIAS_apply(self, func: AggFuncType, axis: Axis = 0, raw: bool = False, 
                 result_type: Literal["expand", "reduce", "broadcast"] | None = None,
                 args=(), **kwargs):
-  # print("Called from Dias")
-
   assert isinstance(self, pd.DataFrame)
 
   default = functools.partial(_DIAS_save_pandas_apply, self, func, axis, raw, result_type, args, **kwargs)
@@ -247,6 +245,64 @@ def _DIAS_apply(self, func: AggFuncType, axis: Axis = 0, raw: bool = False,
     return default()
   arg0_name = func_ast.args.args[0].arg
 
+  ### ApplyVectorized ###
+
+  if patt_matcher.can_be_vectorized_func(func_ast):
+    # We need to introduce an ast.Name, the `called_on`. Say we transform this:
+    #   def foo(row):
+    #     if row['A'] == 1:
+    #       return True
+    #     return False
+    #   df.apply(foo, axis=1)
+    # to:
+    #
+    #   conditions = [df['A'] == 1]
+    #   choices = [True]
+    #   np.select(conditions, choices, default=False)
+
+    # To do that, we need to replace instances of `row` with `df`. However, we don't
+    # the name of the object on which apply() was called. It might not even have a name
+    # e.g., it might have been an expression. We'll just introduce an ast.Name that
+    # points to `self`.
+    ip = get_ipython()
+    called_on_id: str = get_unique_id()
+    ip.user_ns[called_on_id] = self
+    called_on = AST_name(called_on_id)
+    def rewrite_if(if_: ast.If, arg0_name, called_on, cond_value_pairs, else_val):
+      then_ret = if_.body[0]
+      assert isinstance(then_ret, ast.Return)
+      else_ = if_.orelse[0]
+      if isinstance(else_, ast.Return):
+        else_val.append(vec__rewrite_ret_value(else_.value, arg0_name, called_on))
+      else:
+        assert isinstance(else_, ast.If)
+        rewrite_if(else_, arg0_name, called_on, cond_value_pairs, else_val)
+
+      # NOTE - IMPORTANT: Cond-value pairs are pushed in reverse order!
+      cond_value_pairs.append(
+        (
+          vec__rewrite_cond(if_.test, arg0_name, called_on), 
+          vec__rewrite_ret_value(then_ret.value, arg0_name, called_on)
+        )
+      )
+    # END OF rewrite_if()
+    cond_value_pairs = []
+    # This will have a single element but basically we're emulating
+    # a pointer.
+    else_val = []
+    rewrite_if(func_ast.body[0], arg0_name, called_on, cond_value_pairs, else_val)
+    assert len(else_val) == 1
+    
+    np_select_res_id = get_unique_id()
+    np_select_res = AST_name(np_select_res_id)
+    # We should have been able to go from the Call AST to compile() directly, but
+    # Python gave me a hard time, so I did the easy way.
+    np_select_call = vec__build_np_select(cond_value_pairs, else_val)
+    np_select_asgn = AST_assign(np_select_res, np_select_call)
+    ip.run_cell(astor.to_source(np_select_asgn))
+    return ip.user_ns[np_select_res_id]
+
+
   ### ApplyRemoveAxis1 ###
 
   can_remove, the_one_series = patt_matcher.can_remove_axis_1(func_ast, arg0_name)
@@ -264,9 +320,7 @@ def _DIAS_apply(self, func: AggFuncType, axis: Axis = 0, raw: bool = False,
     default_args = func_ast.args.defaults
     ip = get_ipython()
     if has_only_math__preconds(self, default_args, subs, external_names, ip):
-      print('here')
       return func(self)
-  
   return default()
 
 
@@ -591,41 +645,6 @@ def sliced_execution(list_of_lists: List[List[ast.stmt]],
         all_arg_names = [arg.arg for arg in func_ast.args.args]
         buf_list = []
         buf_set = set()
-        if patt_matcher.can_be_vectorized_func(func_ast):
-          def rewrite_if(if_: ast.If, arg0_name, called_on, cond_value_pairs, else_val):
-            then_ret = if_.body[0]
-            assert isinstance(then_ret, ast.Return)
-            else_ = if_.orelse[0]
-            if isinstance(else_, ast.Return):
-              else_val.append(vec__rewrite_ret_value(else_.value, arg0_name, called_on))
-            else:
-              assert isinstance(else_, ast.If)
-              rewrite_if(else_, arg0_name, called_on, cond_value_pairs, else_val)
-
-            # NOTE - IMPORTANT: Cond-value pairs are pushed in reverse order!
-            cond_value_pairs.append(
-              (
-                vec__rewrite_cond(if_.test, arg0_name, called_on), 
-                vec__rewrite_ret_value(then_ret.value, arg0_name, called_on)
-              )
-            )
-          # END OF handle_if()
-          cond_value_pairs = []
-          # This will have a single element but basically we're emulating
-          # a pointer.
-          else_val = []
-          rewrite_if(func_ast.body[0], arg0_name, called_on, cond_value_pairs, else_val)
-          assert len(else_val) == 1
-
-          # Replace the apply()
-          patt.apply_call.call_name.attr_call.call.set_enclosed_obj(
-            vec__build_np_select(cond_value_pairs, else_val)
-          )
-
-          stats["ApplyVectorized"] = 1
-        else:
-          # Don't do anything
-          pass
 
         stmt_source = astor.to_source(blocking_stmt)
         start = time.perf_counter_ns()
