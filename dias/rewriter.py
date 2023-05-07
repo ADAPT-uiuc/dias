@@ -192,12 +192,31 @@ def AST_function_def(name: str, args: List[str], body: List[ast.stmt]) -> ast.Fu
 
 ############ REWRITERS ############
 
+def remove_axis_1(df, mod_ast, func_ast, arg0_name, the_one_series):
+  # Rewrite all the subscripts in the function (it's in-place)  
+  rewrite_subscripts(func_ast, arg0_name, the_one_series)
+
+  # We change the name of the function, basically generating a new function,
+  # because we don't want to overwrite the old one.
+  new_func_name = get_unique_id()
+  func_ast.name = new_func_name
+  new_func_obj = compile(mod_ast, filename="<ast>", mode="exec")
+  # It's important to provide the correct namespace here
+  ip = get_ipython()
+  exec(new_func_obj, ip.user_ns)
+  # We must not recurse. We're calling the apply() of a Series so we should
+  # not recurse.
+  assert df[the_one_series].apply != _DIAS_apply
+  return df[the_one_series].apply(ip.user_ns[new_func_name])
+
 ## apply() overwrite ##
 _DIAS_save_pandas_apply = pd.DataFrame.apply
 def _DIAS_apply(self, func: AggFuncType, axis: Axis = 0, raw: bool = False, 
                 result_type: Literal["expand", "reduce", "broadcast"] | None = None,
                 args=(), **kwargs):
   # print("Called from Dias")
+
+  assert isinstance(self, pd.DataFrame)
 
   default = functools.partial(_DIAS_save_pandas_apply, self, func, axis, raw, result_type, args, **kwargs)
   
@@ -227,24 +246,29 @@ def _DIAS_apply(self, func: AggFuncType, axis: Axis = 0, raw: bool = False,
   if not args_ok:
     return default()
   arg0_name = func_ast.args.args[0].arg
-  can_remove, the_one_series = patt_matcher.can_remove_axis_1(func_ast, arg0_name)
-  if not can_remove:
-    return default()
-  # Rewrite all the subscripts in the function (it's in-place)  
-  rewrite_subscripts(func_ast, arg0_name, the_one_series)
 
-  # We change the name of the function, basically generating a new function,
-  # because we don't want to overwrite the old one.
-  new_func_name = get_unique_id()
-  func_ast.name = new_func_name
-  new_func_obj = compile(mod_ast, filename="<ast>", mode="exec")
-  # It's important to provide the correct namespace here
-  ip = get_ipython()
-  exec(new_func_obj, ip.user_ns)
-  # We must not recurse. We're calling the apply() of a Series so we should
-  # not recurse.
-  assert self[the_one_series].apply != _DIAS_apply
-  return self[the_one_series].apply(ip.user_ns[new_func_name])
+  ### ApplyRemoveAxis1 ###
+
+  can_remove, the_one_series = patt_matcher.can_remove_axis_1(func_ast, arg0_name)
+  if can_remove:
+    return remove_axis_1(self, mod_ast, func_ast, arg0_name, the_one_series)
+  
+  ### ApplyHasOnlyMath ###
+
+  buf_list = []
+  buf_set = set()
+  all_arg_names = [arg.arg for arg in func_ast.args.args]
+  if patt_matcher.has_only_math(func_ast, all_arg_names, subs=buf_list, external_names=buf_set):
+    subs = buf_list
+    external_names = buf_set
+    default_args = func_ast.args.defaults
+    ip = get_ipython()
+    if has_only_math__preconds(self, default_args, subs, external_names, ip):
+      print('here')
+      return func(self)
+  
+  return default()
+
 
 # IMPORTANT: How do we measure the rewriter's time and all that?
 # IMPORTANT: If we import it twice, this will be a problem
@@ -323,17 +347,10 @@ def has_only_math__numeric_ty(ty) -> bool:
       return True
   return False
 
-def has_only_math__preconds(called_on: ast.AST,
+def has_only_math__preconds(the_df: pd.DataFrame,
                             default_args: List[ast.expr], subs: List[str],
                             external_names: List[str],
                             ipython: InteractiveShell) -> bool:
-  # For simplicity, check that the object the .apply()
-  # is called on is a Name, and then verify it's a DataFrame.
-  if not isinstance(called_on, ast.Name):
-    return False
-  the_df = ipython.user_ns[called_on.id]
-  if not isinstance(the_df, pd.DataFrame):
-    return False
   # TODO: Do arguments get the value of when the function is defined
   # or when it is called? If it's the former, the arguments might
   # have changed in between.
@@ -606,23 +623,6 @@ def sliced_execution(list_of_lists: List[List[ast.stmt]],
           )
 
           stats["ApplyVectorized"] = 1
-        elif patt_matcher.has_only_math(func_ast, all_arg_names, subs=buf_list, external_names=buf_set):
-          subs = buf_list
-          external_names = buf_set
-          attr_call = patt.apply_call.call_name.attr_call
-          called_on = attr_call.get_called_on()
-          default_args = func_ast.args.defaults
-          if has_only_math__preconds(called_on, default_args,
-                                     subs, external_names, ipython):
-            # Just call the original function with the df as the first
-            # argument
-            # Replace the call to apply with a call to our new function.
-            the_series = attr_call.get_called_on()
-            assert isinstance(the_series, ast.Name)
-            attr_call.call.set_enclosed_obj(
-              AST_call(func=AST_name(func_ast.name), args=[AST_name(the_series.id)])
-            )
-            stats["ApplyOnlyMath"] = 1
         else:
           # Don't do anything
           pass
