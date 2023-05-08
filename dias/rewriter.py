@@ -495,17 +495,18 @@ def str_split__tolist_and_split(sub_to_split: ast.Subscript,
 
   return ls_name, ls, spl_name, spl
 
-def str_split__wrap_in_if(sub_to_split: ast.Subscript,
-                          then: List[ast.stmt],
-                          else_: List[ast.stmt]):
+def wrap_in_if(obj: ast.Subscript,
+               ty: str,
+               then: List[ast.stmt],
+               else_: List[ast.stmt]):
   return AST_if_else(
     cond=
       AST_cmp(
         lhs=AST_call(
           func=AST_name("type"),
-          args=[sub_to_split]
+          args=[obj]
         ),
-        rhs=AST_attr_chain("pd.Series"),
+        rhs=AST_attr_chain(ty),
         op=ast.NotEq()
       ),
     then_block=then,
@@ -777,6 +778,8 @@ def rewrite_and_exec(cell_ast: ast.Module, ipython: InteractiveShell) -> Tuple[s
     elif isinstance(patt, patt_matcher.SortHead):
       # Replace the call to sort_values() with nsmallest/nlargest.
 
+      # TODO: Wrap it in if that checks it's a DataFrame.
+
       func = "nsmallest"
       if not patt.is_sort_ascending():
         func = "nlargest"
@@ -791,8 +794,6 @@ def rewrite_and_exec(cell_ast: ast.Module, ipython: InteractiveShell) -> Tuple[s
           keywords={'n': n, 'columns': by}
         )
       patt.head.call.set_enclosed_obj(new_call)
-
-      astor.to_source(patt.head.call.get_obj())
 
       stats[type(patt).__name__] = 1
     elif isinstance(patt, patt_matcher.ReplaceRemoveList):
@@ -945,7 +946,7 @@ def rewrite_and_exec(cell_ast: ast.Module, ipython: InteractiveShell) -> Tuple[s
       ### Wrap in if-else block ###
 
       new_stmt = \
-        str_split__wrap_in_if(sub_to_split, then=[stmt_list[0]], else_=rewritten_body)
+        wrap_in_if(sub_to_split, "pd.Series", then=[stmt_list[0]], else_=rewritten_body)
       stmt_list[0] = new_stmt
 
       stats[type(patt).__name__] = 1
@@ -994,9 +995,10 @@ def rewrite_and_exec(cell_ast: ast.Module, ipython: InteractiveShell) -> Tuple[s
       ### Wrap in if-else block ###
 
       new_stmt = \
-        str_split__wrap_in_if(sub_to_split,
-                              then=[assign_orig_res],
-                              else_=rewritten_body)
+        wrap_in_if(sub_to_split,
+                   "pd.Series",
+                   then=[assign_orig_res],
+                   else_=rewritten_body)
       # Replace the split with the new_stmt
       split_stmt_list[0] = new_stmt
       # Replace the index expression with the final result
