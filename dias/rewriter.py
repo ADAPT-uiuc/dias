@@ -13,6 +13,7 @@ import time
 import pandas as pd
 import numpy as np
 import functools
+import copy
 
 from pandas._typing import AggFuncType, Axis
 
@@ -738,32 +739,44 @@ def rewrite_and_exec(cell_ast: ast.Module, ipython: InteractiveShell) -> Tuple[s
 
       assert isinstance(patt, patt_matcher.HasSubstrSearchApply)
 
-
       stats[type(patt).__name__] = 1
     elif isinstance(patt, patt_matcher.IsInplaceUpdate):
       assert len(stmt_idxs) == 1
       stmt_idx = stmt_idxs[0]
       stmt_list = list_of_lists[stmt_idx]
-      stmt = stmt_list[0]
+      orig_stmt = stmt_list[0]
 
-      df = patt.series_call.get_sub().get_df()
-      if not check_DataFrame(df, ipython):
-        continue
-
-      # Let's limit it to top-level for now
-      # TODO: Can we remove that?
-      if patt.assign != stmt:
-        continue
       series_call: patt_matcher.SeriesCall = patt.series_call
+      # Let's limit it to top-level. This makes our life easy
+      # because we can bind the series access to a variable.
+      # The reason we need to that even for CompatSub is that if
+      # it's not a pd.Series, maybe the subscript changes internal state
+      # or who knows what, so the subscript should too be evaluated once.
+      if patt.assign != orig_stmt:
+        continue
 
       func = series_call.attr_call.get_func()
       # TODO: For now, only do it for `fillna` because I haven't tested
       # the rest.
       if func != "fillna":
         continue
+    
+
+      # Assign the subscript result in a temp.
+      tmp = AST_name("_DIAS_ser")
+      asgn = AST_assign(tmp, series_call.get_sub().get_sub_ast())
+      
+
+      # Construct the inplace call.
       call: ast.Call = series_call.attr_call.call.get_obj()
-      call.keywords.append(ast.keyword(arg='inplace', value=ast.Constant(value=True, kind=None)))
-      stmt_list[0] = ast.Expr(value=call)
+      call_copy = copy.deepcopy(call)
+      call_copy.keywords.append(ast.keyword(arg='inplace', value=ast.Constant(value=True, kind=None)))
+      expr_call = ast.Expr(value=call_copy)
+      
+      precond_check = wrap_in_if(tmp, "pd.Series", [orig_stmt], [expr_call])
+
+      stmt_list[0] = asgn
+      stmt_list.append(precond_check)
 
       stats[type(patt).__name__] = 1
     elif isinstance(patt, patt_matcher.HasToListConcatToSeries):

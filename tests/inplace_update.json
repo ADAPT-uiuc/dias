@@ -1,36 +1,36 @@
 {
   "cells":[
     {
-      "raw":"\nraw_x = pd.read_csv('titanic.csv')\n",
-      "modified":"raw_x = pd.read_csv('titanic.csv')\n",
+      "raw":"\ndf = pd.DataFrame({'A': [1, None], 'B': [2, 3]})\n",
+      "modified":"df = pd.DataFrame({'A': [1, None], 'B': [2, 3]})\n",
       "patts-hit":{
         
       },
-      "rewritten-exec-time":2.40152
+      "rewritten-exec-time":0.533317
     },
     {
-      "raw":"\nraw_x = pd.read_csv('titanic.csv')\n",
-      "modified":"raw_x = pd.read_csv('titanic.csv')\n",
+      "raw":"\ndf = pd.DataFrame({'A': [1, None], 'B': [2, 3]})\n",
+      "modified":"df = pd.DataFrame({'A': [1, None], 'B': [2, 3]})\n",
       "patts-hit":{
         
       },
-      "rewritten-exec-time":1.905944
+      "rewritten-exec-time":0.307124
     },
     {
-      "raw":"\n# Repeat for correctness\nraw_x[\"Orig\"]=raw_x[\"Age\"].fillna(raw_x[\"Age\"].mean())\n",
-      "modified":"raw_x['Orig'] = raw_x['Age'].fillna(raw_x['Age'].mean())\n",
+      "raw":"\n# DIAS_VERBOSE\ndf[\"A\"]=df[\"A\"].fillna(5)\n",
+      "modified":"_DIAS_ser = df['A']\nif type(_DIAS_ser) != pd.Series:\n    df['A'] = df['A'].fillna(5)\nelse:\n    df['A'].fillna(5, inplace=True)\n",
       "patts-hit":{
-        
+        "IsInplaceUpdate":1
       },
-      "rewritten-exec-time":0.582138
+      "rewritten-exec-time":0.441576
     },
     {
-      "raw":"\nassert (save == raw_x['Orig']).all()\n",
-      "modified":"assert (save == raw_x['Orig']).all()\n",
+      "raw":"\nassert (save == df['A']).all()\n",
+      "modified":"assert (save == df['A']).all()\n",
       "patts-hit":{
         
       },
-      "rewritten-exec-time":0.299794
+      "rewritten-exec-time":0.321755
     }
   ]
 }
