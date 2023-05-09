@@ -1,0 +1,28 @@
+{
+  "cells":[
+    {
+      "raw":"\ndf = pd.DataFrame({'A': [1, 2], 'B': [3, 4]})\n",
+      "modified":"df = pd.DataFrame({'A': [1, 2], 'B': [3, 4]})\n",
+      "patts-hit":{
+        
+      },
+      "rewritten-exec-time":0.504716
+    },
+    {
+      "raw":"\n# DIAS_VERBOSE\ndef foo():\n    y = 2\n    return df['A'].sort_values().head(n=y)\n    \nour = foo()\n",
+      "modified":"def foo():\n    y = 2\n    return dias.rewriter.sort_head(called_on=df['A'], by=None, n=y, asc=\n        True, orig=lambda _DIAS_x: _DIAS_x.sort_values().head(n=y))\nour = foo()\n",
+      "patts-hit":{
+        "SortHead":1
+      },
+      "rewritten-exec-time":0.83572
+    },
+    {
+      "raw":"\n# Convert to list so that we don't take account of the index.\ncomp = [x == y for x, y in zip(our.tolist(), defa.tolist())]\nassert all(comp)\n",
+      "modified":"comp = [(x == y) for x, y in zip(our.tolist(), defa.tolist())]\nassert all(comp)\n",
+      "patts-hit":{
+        
+      },
+      "rewritten-exec-time":0.226413
+    }
+  ]
+}

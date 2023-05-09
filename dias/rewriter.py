@@ -868,6 +868,20 @@ def rewrite_and_exec(cell_ast: ast.Module, ipython: InteractiveShell) -> Tuple[s
       # to do the same thing for the rewritten version, but it's easier and more comprehensible to
       # "perform the rewriting" (not really) in sort_head(), passing only the parameters to produce
       # the version to be called correctly (if you look at sort_head(), this will make sense).
+      #
+      # Note that a lambda will capture the local environment. So, for example, this:
+      #   y = 3
+      #   def bar(lam):
+      #     return lam()
+      #
+      #   def foo():
+      #     y = 2
+      #     return bar(lambda: y)
+      #   print(foo())
+      #   print(y)
+      #
+      # will print 2, 3 (the global is not changed by foo() and the lambda captures the local environment of
+      # the foo() when called from bar())
 
       n = patt.get_head_n()
       by = patt.get_sort_by()
@@ -875,7 +889,8 @@ def rewrite_and_exec(cell_ast: ast.Module, ipython: InteractiveShell) -> Tuple[s
       if by is None:
         by = ast.Constant(value=None)
 
-      res_id = "x"
+      # We _need_ to pick a name that won't clobber other locals and globals.
+      res_id = "_DIAS_x"
       # Get the called-on part.
       orig_called_on = patt.sort_values.get_called_on()
       # Replace it with the argument of the lambda. Remember, the lambda
