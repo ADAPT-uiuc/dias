@@ -6,15 +6,15 @@
       "patts-hit":{
         
       },
-      "rewritten-exec-time":2.360441
+      "rewritten-exec-time":2.305598
     },
     {
-      "raw":"\nour = df['Name'].apply(lambda s: 'G' in s)\n",
-      "modified":"_REWR_tmp_0 = df['Name']\n_REWR_tmp_1 = _REWR_tmp_0.tolist()\n_REWR_tmp_2 = [('G' in s) for s in _REWR_tmp_1]\nour = pd.Series(_REWR_tmp_2, index=_REWR_tmp_0.index)\n",
+      "raw":"\n# DIAS_VERBOSE\nour = df['Name'].apply(lambda s: 'G' in s)\n",
+      "modified":"our = dias.rewriter.substr_search_apply(ser=df['Name'], needle='G', orig=lambda\n    _DIAS_x: _DIAS_x.apply(lambda s: 'G' in s))\n",
       "patts-hit":{
         "HasSubstrSearchApply":1
       },
-      "rewritten-exec-time":0.483347
+      "rewritten-exec-time":0.348276
     },
     {
       "raw":"\nassert (our == defa).all()\n",
@@ -22,7 +22,7 @@
       "patts-hit":{
         
       },
-      "rewritten-exec-time":0.311664
+      "rewritten-exec-time":0.298625
     }
   ]
 }

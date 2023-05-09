@@ -375,8 +375,14 @@ class HasSubstrSearchApply:
     func = series_call.attr_call.get_func()
     assert _a(func == "apply")
 
-  def get_needle(self) -> Union[ast.Name, ast.Constant]:
+  def get_hay(self) -> Union[ast.Name, ast.Constant]:
     comp = self.compare.comparators[0]
+    # Silence mypy
+    assert isinstance(comp, ast.Name) or isinstance(comp, ast.Constant)
+    return comp
+
+  def get_needle(self) -> Union[ast.Name, ast.Constant]:
+    comp = self.compare.left
     # Silence mypy
     assert isinstance(comp, ast.Name) or isinstance(comp, ast.Constant)
     return comp

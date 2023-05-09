@@ -6,7 +6,7 @@
       "patts-hit":{
         
       },
-      "rewritten-exec-time":2.32464
+      "rewritten-exec-time":2.35441
     },
     {
       "raw":"\ndf = df[:10]\ndf = df.drop([1, 3])\n",
@@ -14,15 +14,15 @@
       "patts-hit":{
         
       },
-      "rewritten-exec-time":0.683689
+      "rewritten-exec-time":0.686489
     },
     {
       "raw":"\nrewr = df['Name'].apply(lambda s: 'G' in s)\n",
-      "modified":"_REWR_tmp_0 = df['Name']\n_REWR_tmp_1 = _REWR_tmp_0.tolist()\n_REWR_tmp_2 = [('G' in s) for s in _REWR_tmp_1]\nrewr = pd.Series(_REWR_tmp_2, index=_REWR_tmp_0.index)\n",
+      "modified":"rewr = dias.rewriter.substr_search_apply(ser=df['Name'], needle='G', orig=\n    lambda _DIAS_x: _DIAS_x.apply(lambda s: 'G' in s))\n",
       "patts-hit":{
         "HasSubstrSearchApply":1
       },
-      "rewritten-exec-time":0.363074
+      "rewritten-exec-time":0.293424
     },
     {
       "raw":"\nassert (orig == rewr).all()\n",
@@ -30,7 +30,7 @@
       "patts-hit":{
         
       },
-      "rewritten-exec-time":0.292044
+      "rewritten-exec-time":0.294064
     }
   ]
 }

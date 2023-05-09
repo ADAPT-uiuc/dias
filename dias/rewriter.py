@@ -343,6 +343,14 @@ def sort_head(called_on, by: str | None, n: int, asc: bool, orig: Callable):
     assert isinstance(orig, types.LambdaType)
     return orig(called_on)
 
+def substr_search_apply(ser, needle: str, orig: Callable):
+  if type(ser) == pd.Series:
+    _DIAS_ls = ser.tolist()
+    _DIAS_res = [(needle in s) for s in _DIAS_ls]
+    return pd.Series(_DIAS_res, index=ser.index)
+  else:
+    return orig()
+
 # If `name` exists in the current IPython namespace, check that
 # its type is DataFrame
 def check_DataFrame(name: str, ipython) -> bool:
@@ -698,49 +706,35 @@ def rewrite_and_exec(cell_ast: ast.Module, ipython: InteractiveShell) -> Tuple[s
       continue
 
     if isinstance(patt, patt_matcher.HasSubstrSearchApply):
-      assert len(stmt_idxs) == 1
-      stmt_idx = stmt_idxs[0]
-      stmt_list = list_of_lists[stmt_idx]
-      stmt = stmt_list[0]
+      # Similar to SortHead
 
-      df = patt.series_call.get_sub().get_df()
-      if not check_DataFrame(df, ipython):
-        continue
+      lam_arg = "_DIAS_x"
+      apply_call = patt.series_call.attr_call
+      orig_called_on = apply_call.get_called_on()
+      apply_call.set_called_on(AST_name(lam_arg))
+      orig_called_on_replaced = apply_call.call.get_obj()
+      lambda_args = ast.arguments(
+        args=[ast.arg(arg=lam_arg)],
+        defaults=[],
+        kw_defaults=[],
+        kwarg=None,
+        kwonlyargs=[],
+        posonlyargs=[],
+        vararg=None
+      )
+      orig_wrapped_in_lambda = \
+        ast.Lambda(args=lambda_args, 
+                   body=orig_called_on_replaced)
+      
+      new_call = \
+        AST_attr_call(
+          called_on=AST_attr_chain('dias.rewriter'),
+          name="substr_search_apply",
+          keywords={'ser': orig_called_on, 'needle': patt.get_needle(),
+                    'orig': orig_wrapped_in_lambda}
+        )
 
-      sub = patt.series_call.get_sub().get_sub_ast()
-
-      tmp_sub_id: str = get_unique_id()
-      tmp_sub_name = ast.Name(id=tmp_sub_id)
-      tmp_sub_asgn = ast.Assign(targets=[tmp_sub_name], value=sub)
-
-      listified_id: str = get_unique_id()
-      listified = ast.Name(id=listified_id)
-
-      listify_stmt = \
-        ast.Assign(targets=[listified],
-          value=AST_attr_call(called_on=tmp_sub_name, name='tolist'))
-
-      pred_id: str = get_unique_id()
-      pred = ast.Name(id=pred_id)
-      pred_stmt = \
-      ast.Assign(targets=[pred],
-        value=ast.ListComp(
-          elt=patt.compare,
-          generators=[ast.comprehension(target=patt.get_needle(), iter=listified, ifs=[], is_async=0)]),
-        type_comment=None)
-
-      stmt_list[0] = tmp_sub_asgn
-      stmt_list.append(listify_stmt)
-      stmt_list.append(pred_stmt)
-      stmt_list.append(stmt)
-
-      # This implicitly updates `stmt`
-      opt_call = patt.series_call.attr_call.call
-      res_to_series = \
-        AST_attr_call(ast.Name("pd"), 
-                      ast.Name("Series"), args=[pred])
-      res_to_series.keywords = [ast.keyword(arg="index", value=ast.Attribute(value=tmp_sub_name, attr="index"))]
-      opt_call.set_enclosed_obj(res_to_series)
+      apply_call.call.set_enclosed_obj(new_call)
 
       assert isinstance(patt, patt_matcher.HasSubstrSearchApply)
 
@@ -890,15 +884,15 @@ def rewrite_and_exec(cell_ast: ast.Module, ipython: InteractiveShell) -> Tuple[s
         by = ast.Constant(value=None)
 
       # We _need_ to pick a name that won't clobber other locals and globals.
-      res_id = "_DIAS_x"
+      lam_arg = "_DIAS_x"
       # Get the called-on part.
       orig_called_on = patt.sort_values.get_called_on()
       # Replace it with the argument of the lambda. Remember, the lambda
       # eventually will be sth like: lambda x: x.sort_values().head().
-      patt.sort_values.set_called_on(AST_name(res_id))
+      patt.sort_values.set_called_on(AST_name(lam_arg))
       orig_called_on_replaced = patt.head.call.get_obj()
       lambda_args = ast.arguments(
-        args=[ast.arg(arg=res_id)],
+        args=[ast.arg(arg=lam_arg)],
         defaults=[],
         kw_defaults=[],
         kwarg=None,
