@@ -352,19 +352,6 @@ def substr_search_apply(ser, needle: str, orig: Callable):
   else:
     return orig(ser)
 
-# If `name` exists in the current IPython namespace, check that
-# its type is DataFrame
-def check_DataFrame(name: str, ipython) -> bool:
-  # There is a problem here in that the `name` may be created (as a DataFrame) and accessed
-  # in the same cell. So, before running it, we can't know its type.
-  # So, this function returns False if it _does_ exist, but it's a pandas.DataFrame.
-  # Of course, it might be changed to a pandas.DataFrame in this cell, before the point at
-  # which we want it to be a DataFrame. In this case, we bail, although we shouldn't. But
-  # we're still sound.
-  if name in ipython.user_ns and type(ipython.user_ns[name]) != pd.DataFrame:
-    return False
-  return True
-
 # Return the func_ast and the name of the first argument.
 def get_func_ast_and_arg_name(func_name: str, ipython: InteractiveShell) -> Tuple[ast.FunctionDef, str]:
   # We have executed all the code up to here, so it should be available.
@@ -624,7 +611,7 @@ def vec__build_np_select(cond_value_pairs, else_val):
   return np_select
 
 # I don't think we can declare a type for `ipython`
-def rewrite_and_exec(cell_ast: ast.Module, ipython: InteractiveShell) -> Tuple[str, Dict, Dict]:
+def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
   assert isinstance(cell_ast, ast.Module)
   body = cell_ast.body
   matched_patts = patt_matcher.patt_match(body)
@@ -1454,13 +1441,8 @@ def rewrite_and_exec(cell_ast: ast.Module, ipython: InteractiveShell) -> Tuple[s
       new_source = new_source + astor.to_source(stmt)
     # END: for stmt ...
   # END: for stmt_list ...
-  start = time.perf_counter_ns()
-  ipython.run_cell(new_source)
-  end = time.perf_counter_ns()
-  time_spent_in_exec = end-start
 
-  return new_source, stats, time_spent_in_exec
-
+  return new_source, stats
 
 
 # In call_rewrite(), we modify the code such that it calls rewrite(). Inside
@@ -1484,7 +1466,11 @@ def rewrite(line: str, cell: str):
   cell_ast = ast.parse(cell)
   # dbg_print(astor.dump(cell_ast))
   # dbg_print("--------- Modify AST -----------")
-  new_source, hit_stats, time_spent_in_exec = rewrite_and_exec(cell_ast, ipython)
+  new_source, hit_stats = rewrite_ast(cell_ast)
+  start = time.perf_counter_ns()
+  ipython.run_cell(new_source)
+  end = time.perf_counter_ns()
+  time_spent_in_exec = end-start
   if line.strip() == "verbose":
     if not len(hit_stats):
       if not is_notebook_env():
