@@ -1,0 +1,44 @@
+{
+  "cells":[
+    {
+      "raw":"\nglb = 0\n",
+      "modified":"glb = 0\n",
+      "patts-hit":{
+        
+      },
+      "rewritten-exec-time":0.190463
+    },
+    {
+      "raw":"\ndef reset_glb():\n    global glb\n    glb = 0\n\ndef ret2(_, snd):\n    return snd\ndef changes_glb():\n    global glb\n    glb = glb + 1\n\ndef reads_glb():\n    global glb\n    return pd.Series([x for x in range(glb, 100)])\n",
+      "modified":"def reset_glb():\n    global glb\n    glb = 0\ndef ret2(_, snd):\n    return snd\ndef changes_glb():\n    global glb\n    glb = glb + 1\ndef reads_glb():\n    global glb\n    return pd.Series([x for x in range(glb, 100)])\n",
+      "patts-hit":{
+        
+      },
+      "rewritten-exec-time":0.411895
+    },
+    {
+      "raw":"\nreset_glb()\n",
+      "modified":"reset_glb()\n",
+      "patts-hit":{
+        
+      },
+      "rewritten-exec-time":0.159182
+    },
+    {
+      "raw":"\n# DIAS_VERBOSE\nour = ret2(changes_glb(), reads_glb().sort_values().head())\n",
+      "modified":"our = ret2(changes_glb(), dias.rewriter.sort_head(called_on=reads_glb(), by\n    =None, n=5, asc=True, orig=lambda x: x.sort_values().head()))\n",
+      "patts-hit":{
+        "SortHead":1
+      },
+      "rewritten-exec-time":0.946093
+    },
+    {
+      "raw":"\n# Convert to list so that we don't take account of the index.\ncomp = [x == y for x, y in zip(our.tolist(), defa.tolist())]\nassert all(comp)\n",
+      "modified":"comp = [(x == y) for x, y in zip(our.tolist(), defa.tolist())]\nassert all(comp)\n",
+      "patts-hit":{
+        
+      },
+      "rewritten-exec-time":0.238133
+    }
+  ]
+}

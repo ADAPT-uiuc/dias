@@ -6,7 +6,7 @@
       "patts-hit":{
         
       },
-      "rewritten-exec-time":54.001078
+      "rewritten-exec-time":51.435093
     },
     {
       "raw":"\nLABEL_COLUMNS = ['cohesion', 'syntax', 'vocabulary', 'phraseology', 'grammar', 'conventions']\ntrain_df['total_score'] = train_df[LABEL_COLUMNS].sum(axis=1)\n",
@@ -14,15 +14,15 @@
       "patts-hit":{
         
       },
-      "rewritten-exec-time":1.077094
+      "rewritten-exec-time":1.035713
     },
     {
-      "raw":"\nour = train_df['total_score'].sort_values().head(4)\n",
-      "modified":"our = train_df['total_score'].nsmallest(n=4)\n",
+      "raw":"\n# DIAS_VERBOSE\nour = train_df['total_score'].sort_values().head(4)\n",
+      "modified":"our = dias.rewriter.sort_head(called_on=train_df['total_score'], by=None, n\n    =4, asc=True, orig=lambda x: x.sort_values().head(4))\n",
       "patts-hit":{
         "SortHead":1
       },
-      "rewritten-exec-time":0.754419
+      "rewritten-exec-time":0.75516
     },
     {
       "raw":"\n# Convert to list so that we don't take account of the index. See correctness note above.\ncomp = [x == y for x, y in zip(our.tolist(), defa.tolist())]\nassert all(comp)\n",
@@ -30,7 +30,7 @@
       "patts-hit":{
         
       },
-      "rewritten-exec-time":0.242363
+      "rewritten-exec-time":0.231033
     }
   ]
 }

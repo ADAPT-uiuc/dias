@@ -142,6 +142,10 @@ class AttrCall:
     attr_ast = self.get_attr_ast()
     return attr_ast.value
   
+  def set_called_on(self, new_obj):
+    attr_ast = self.get_attr_ast()
+    attr_ast.value = new_obj
+
   def get_func(self) -> str:
     attr_ast = self.get_attr_ast()
     return attr_ast.attr

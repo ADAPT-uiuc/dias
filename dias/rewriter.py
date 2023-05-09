@@ -4,7 +4,8 @@ from IPython.display import display, Markdown
 import ast
 import os
 import sys
-from typing import Dict, List, Union, Optional, Tuple, Any, Set, Literal
+from typing import Dict, List, Union, Optional, Tuple, Any, Set, Literal, Callable
+import types
 import pickle
 import inspect
 import json
@@ -327,6 +328,21 @@ assert pd.DataFrame.apply != _DIAS_apply
 # https://github.com/lux-org/lux/blob/550a2eca90b26c944ebe8600df7a51907bc851be/lux/core/__init__.py#L27
 pd.DataFrame.apply = pd.core.frame.DataFrame.apply = _DIAS_apply
 
+def sort_head(called_on, by: str | None, n: int, asc: bool, orig: Callable):
+  func = "nsmallest" if asc else "nlargest"
+
+  req_ty = pd.DataFrame
+  opt_func_obj = functools.partial(getattr(req_ty, func), n=n, columns=by)
+  if by is None:
+    req_ty = pd.Series
+    opt_func_obj = functools.partial(getattr(req_ty, func), n=n)
+  
+  if type(called_on) == req_ty:
+    return opt_func_obj(self=called_on)
+  else:
+    assert isinstance(orig, types.LambdaType)
+    return orig(called_on)
+
 # If `name` exists in the current IPython namespace, check that
 # its type is DataFrame
 def check_DataFrame(name: str, ipython) -> bool:
@@ -495,7 +511,7 @@ def str_split__tolist_and_split(sub_to_split: ast.Subscript,
 
   return ls_name, ls, spl_name, spl
 
-def wrap_in_if(obj: ast.Subscript,
+def wrap_in_if(obj: ast.AST,
                ty: str,
                then: List[ast.stmt],
                else_: List[ast.stmt]):
@@ -778,21 +794,116 @@ def rewrite_and_exec(cell_ast: ast.Module, ipython: InteractiveShell) -> Tuple[s
     elif isinstance(patt, patt_matcher.SortHead):
       # Replace the call to sort_values() with nsmallest/nlargest.
 
-      # TODO: Wrap it in if that checks it's a DataFrame.
+      # We need to check that the called-on object is a pd.Series (or pd.DataFrame; it can be both
+      # but that's not the important thing here). The called-on object is what appears before .sort_values()
+      # Say that the original is this (the called-on is foo().reads_x()):
+      #   x = ...
+      #   test(changes_x(), foo().reads_x().sort_values().head())
+      # We can execute the following instead:
+      #   x = ...
+      #   test(changes_x(), foo().reads_x().nsmallest())
+      # iff foo().reads_x() is a pd.Series. The problem is how/when do we do the check?
+      # The naive way would be to wrap an if around checking the type of called-on:
+      #   if type(foo().reads_x()) == pd.Series:
+      #     test(changes_x(), foo().reads_x().nsmallest())
+      #   else:
+      #     <original>
+      #
+      # The problem with this is that called-on is evaluated twice, which doesn't
+      # happen in the original program. This can be both a performance problem but also a correctness
+      # problem if the called-on evaluation accesses/changes some global state. In particular here,
+      # called-on reads `x`, which is changed in the call to changes_x(). So, the first and second
+      # evaluations of called-on will be different.
+      #
+      # What we want is to _bind_ the result to a variable and then reuse that:
+      #   called_on = foo().reads_x()
+      #   if type(called_on) == pd.Series:
+      #     test(changes_x(), called_on.nsmallest())
+      #   else:
+      #     <original>
+      #
+      # This still has a problem however. In the original code, the called-on evaluation should
+      # read the updated value of `x`, i.e., after the call to changes_x(), but here, it will read
+      # a stale value. What we need here is a _local_ binding, exactly at the place where the original
+      # sub-expression (i.e., the call chain foo().reads_x().sort_values().head()) appeared. Basically,
+      # we need a let binding like in e.g., OCaml:
+      #   test(changes_x(), 
+      #     let called_on = foo().reads_x() in called_on.nsmallest() 
+      #       if type(called_on) == pd.Series 
+      #       else ...)
+      #
+      # However, I don't know of a way to do that in Python. A workaround is to create a function, evalute
+      # the called-on and pass it as an argument. This is a local binding, as the result of called-on is
+      # bound to the argument (and what would appear after "in" is the body of the function)
+      #   def sort_head(called_on, ...):
+      #     if type(called_on) == pd.Series:
+      #       return called_on.nsmallest()
+      #     else:
+      #       return called_on.sort_values().head()
+      #   test(changes_x(), sort_head(foo.reads_x()))
+      #
+      # This is basically the solution we will employ, but we have some practical problems.
+      # The original version is not always the same. It can be:
+      # - <whatever>.sort_values().head()
+      # or
+      # - <whatever>.sort_values(columns='...').head()
+      # or
+      # - <whatever>.sort_values().head(n=7)
+      # ... etc.
+      #
+      # Which means, we cannot create _one_ such function which has the original code hardcoded (the same
+      # holds for the rewritten, for the same reasons). Ideally, we would like to make this function
+      # parametric to the original code. But, in general a function can't get "code" as an argument. Code
+      # can be 3 things:
+      # (1) A string
+      # (2) An AST
+      # (3) A compiled object
+      # 
+      # Now, remember, the rewriter ouptputs a string (which will contain the call to sort_head()). (1) is ok
+      # but it's generally unreliable. (2) is not ok because we need a stringified version of the AST, but
+      # I don't know how to do that. And (3) just doesn't work because again, the rewriter outputs strings,
+      # not objects.
+      #
+      # The solution is to wrap the original code in a lambda, and pass that. We would theoretically need
+      # to do the same thing for the rewritten version, but it's easier and more comprehensible to
+      # "perform the rewriting" (not really) in sort_head(), passing only the parameters to produce
+      # the version to be called correctly (if you look at sort_head(), this will make sense).
 
-      func = "nsmallest"
-      if not patt.is_sort_ascending():
-        func = "nlargest"
-      
       n = patt.get_head_n()
       by = patt.get_sort_by()
 
+      if by is None:
+        by = ast.Constant(value=None)
+
+      res_id = "x"
+      # Get the called-on part.
+      orig_called_on = patt.sort_values.get_called_on()
+      # Replace it with the argument of the lambda. Remember, the lambda
+      # eventually will be sth like: lambda x: x.sort_values().head().
+      patt.sort_values.set_called_on(AST_name(res_id))
+      orig_called_on_replaced = patt.head.call.get_obj()
+      lambda_args = ast.arguments(
+        args=[ast.arg(arg=res_id)],
+        defaults=[],
+        kw_defaults=[],
+        kwarg=None,
+        kwonlyargs=[],
+        posonlyargs=[],
+        vararg=None
+      )
+      orig_wrapped_in_lambda = \
+        ast.Lambda(args=lambda_args, 
+                   body=orig_called_on_replaced)
+
       new_call = \
         AST_attr_call(
-          called_on=patt.sort_values.get_called_on(),
-          name=func,
-          keywords={'n': n, 'columns': by}
+          called_on=AST_attr_chain('dias.rewriter'),
+          name="sort_head",
+          keywords={'called_on': orig_called_on, 'by': by, 
+                    'n': n, 'asc': ast.Constant(value=patt.is_sort_ascending()), 
+                    'orig': orig_wrapped_in_lambda}
         )
+      
       patt.head.call.set_enclosed_obj(new_call)
 
       stats[type(patt).__name__] = 1
