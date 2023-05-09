@@ -764,17 +764,6 @@ def is_apply_or_map(attr_call: AttrCall) -> Optional[Union[ApplyOrMap, ApplyVect
     return None
   return ApplyOrMap(call_name=call_name)
 
-
-
-# NOTE: Only apply() is a DataFrame call. map() is for Series
-class RemoveAxis1:
-  # A little stupid because `apply_call` and `call_name` share
-  # `attr_call`
-  def __init__(self, apply_call: ApplyOrMap) -> None:
-    attr_call = apply_call.call_name.attr_call
-    assert attr_call.get_func() == "apply"
-    self.apply_call = apply_call
-
 class RemoveAxis1Lambda:
   def __init__(self, call_name: CallOnName, lam: ast.Lambda, 
                the_one_series: str) -> None:
@@ -829,7 +818,7 @@ def can_remove_axis_1(tree: ast.AST, arg0_name: str) -> Tuple[bool, str]:
     return False, ""
   return True, the_one_series
 
-def is_remove_axis_1(apply_call: ApplyOrMap) -> Optional[Union[RemoveAxis1, RemoveAxis1Lambda]]:
+def is_remove_axis_1_lambda(apply_call: ApplyOrMap) -> Optional[RemoveAxis1Lambda]:
   call_name = apply_call.call_name
   call = call_name.attr_call.call.get_obj()
   if call_name.attr_call.get_func() != "apply":
@@ -852,51 +841,16 @@ def is_remove_axis_1(apply_call: ApplyOrMap) -> Optional[Union[RemoveAxis1, Remo
   if len(call.args) != 1:
     return None
   arg0 = call.args[0]
-  if isinstance(arg0, ast.Name):
-    return RemoveAxis1(apply_call=apply_call)
-  elif isinstance(arg0, ast.Lambda):
-    lam = arg0
-    if len(lam.args.args) != 1:
-      return None
-    lam_arg0 = lam.args.args[0].arg
-    can_remove, the_one_series = can_remove_axis_1(arg0.body, lam_arg0)
-    if can_remove:
-      return RemoveAxis1Lambda(call_name=call_name, 
-                               lam=lam, the_one_series=the_one_series)
-  return None
-
-# TODO: Should we have a generic MultipleOptions type or sth ?
-# The current solution looks a little bad. The generic solution would be for recognize_pattern()
-# to return a list of overlapping patterns (this list can have 1 element).
-# Then patt_match() would return a list of lists. Each of these lists will
-# be a list of tuples. Each list of tuples denotes a list of overlapping patterns.
-# Each tuple is a pattern along with its stmt indexes.
-# However, this complicates the code a lot (I kind of tried it) and I am not sure it's
-# worth it. I.e., I think that solution looked even more horrible.
-class ApplyCallMaybeRemoveAxis1:
-  class Kind(Enum):
-    APPLY_CALL = 0,
-    REMOVE_AXIS_1 = 1
-
-  def __init__(self, kind: Kind, apply_call: Optional[ApplyOrMap], remove_axis_1: Optional[RemoveAxis1] = None) -> None:
-    assert kind == self.Kind.APPLY_CALL or kind == self.Kind.REMOVE_AXIS_1
-    self.kind = kind
-    self.apply_call = apply_call
-    self.remove_axis_1 = None
-    if kind == self.Kind.REMOVE_AXIS_1:
-      self.remove_axis_1 = remove_axis_1
-  
-  def get_kind(self) -> Kind:
-    return self.kind
-  
-  def get_apply_call(self) -> ApplyOrMap:
-    assert self.apply_call is not None
-    return self.apply_call
-
-  def get_remove_axis_1(self) -> RemoveAxis1:
-    assert self.get_kind() == self.Kind.REMOVE_AXIS_1
-    assert self.remove_axis_1 is not None
-    return self.remove_axis_1
+  if not isinstance(arg0, ast.Lambda):
+    return None
+  lam = arg0
+  if len(lam.args.args) != 1:
+    return None
+  lam_arg0 = lam.args.args[0].arg
+  can_remove, the_one_series = can_remove_axis_1(arg0.body, lam_arg0)
+  if can_remove:
+    return RemoveAxis1Lambda(call_name=call_name, 
+                              lam=lam, the_one_series=the_one_series)
 
 class SortHead:
   def __init__(self, head_: AttrCall, sort_values_: AttrCall) -> None:
@@ -1458,7 +1412,6 @@ Union[
   HasSubstrSearchApply,
   IsInplaceUpdate,
   HasToListConcatToSeries,
-  ApplyCallMaybeRemoveAxis1,
   RemoveAxis1Lambda,
   IsTrivialDFCall,
   IsTrivialDFAttr,
@@ -1547,29 +1500,15 @@ def recognize_pattern(stmt: ast.stmt) ->  Optional[Single_Stmt_Patts]:
           # TODO: These are overlapping. And this is the first
           # instance that tells us that we should support giving
           # to the user multiple options.
-          remove_axis_1 = is_remove_axis_1(apply_call)
+          remove_axis_1 = is_remove_axis_1_lambda(apply_call)
           if remove_axis_1 is not None:
-            if isinstance(remove_axis_1, RemoveAxis1Lambda):
-              return remove_axis_1
-            else:
-              assert isinstance(remove_axis_1, RemoveAxis1)
-              return ApplyCallMaybeRemoveAxis1(
-                kind=ApplyCallMaybeRemoveAxis1.Kind.REMOVE_AXIS_1,
-                apply_call=remove_axis_1.apply_call,
-                remove_axis_1=remove_axis_1)
+            return remove_axis_1
           # END OF IF #
 
           call = attr_call.call.get_obj()
           arg0 = call.args[0]
           # Return only if the function to call is a Name.
-          # TODO: This needs immediate cleanup. It has become
-          # very ugly. The whole ApplyCallMaybeRemoveAxis1 has
-          # to leave.
-          if isinstance(arg0, ast.Name):
-            return ApplyCallMaybeRemoveAxis1(
-              kind=ApplyCallMaybeRemoveAxis1.Kind.APPLY_CALL,
-              apply_call=apply_call)
-          elif isinstance(arg0, ast.Lambda):
+          if isinstance(arg0, ast.Lambda):
             lam = arg0
             vec_lam = can_be_vectorized_lambda(lam, attr_call)
             if vec_lam is not None:
