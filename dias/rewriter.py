@@ -1,12 +1,10 @@
-from IPython.core.magic import register_cell_magic
 from IPython import get_ipython, InteractiveShell
 from IPython.display import display, Markdown
 import ast
 import os
 import sys
-from typing import Dict, List, Union, Optional, Tuple, Any, Set, Literal, Callable
+from typing import Dict, List, Optional, Tuple, Any, Literal, Callable
 import types
-import pickle
 import inspect
 import json
 import time
@@ -54,9 +52,6 @@ def is_notebook_env() -> bool:
       return False  # Other type (?)
   except NameError:
     return False      # Probably standard Python interpreter
-
-def get_mod_time(filepath):
-  return os.path.getmtime(filepath)
 
 def eprint(*args, **kwargs):
   print(*args, file=sys.stderr, **kwargs)
@@ -351,28 +346,6 @@ def substr_search_apply(ser, needle: str, orig: Callable):
     return pd.Series(_DIAS_res, index=ser.index)
   else:
     return orig(ser)
-
-# Return the func_ast and the name of the first argument.
-def get_func_ast_and_arg_name(func_name: str, ipython: InteractiveShell) -> Tuple[ast.FunctionDef, str]:
-  # We have executed all the code up to here, so it should be available.
-  assert func_name in ipython.user_ns
-  func_obj = ipython.user_ns[func_name]
-  # I don't of a way to get the AST directly.
-  func_source = inspect.getsource(func_obj)
-  mod_ast = ast.parse(func_source)
-  func_ast = mod_ast.body[0]
-  assert isinstance(func_ast, ast.FunctionDef)
-  # Either we have one argument or if we have more, they
-  # have default values. We must have only one argument that
-  # we pass because we have checked that the apply gets a single
-  # argument as its first argument, which is a name, this name
-  # will be called with a single argument. Also, note that in Python
-  # all default arguments should be after all non-default. In other words,
-  # you cannot e.g., default, non-default.
-  assert (len(func_ast.args.args) == 1 or 
-          len(func_ast.args.defaults) == (len(func_ast.args.args) - 1))
-  arg0_name = func_ast.args.args[0].arg
-  return func_ast, arg0_name
 
 def rewrite_enclosed_sub(enclosed_sub, arg0_name, the_one_series):
   sub = enclosed_sub.get_obj()
