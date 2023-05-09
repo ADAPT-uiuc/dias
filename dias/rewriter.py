@@ -349,7 +349,7 @@ def substr_search_apply(ser, needle: str, orig: Callable):
     _DIAS_res = [(needle in s) for s in _DIAS_ls]
     return pd.Series(_DIAS_res, index=ser.index)
   else:
-    return orig()
+    return orig(ser)
 
 # If `name` exists in the current IPython namespace, check that
 # its type is DataFrame
