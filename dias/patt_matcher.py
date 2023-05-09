@@ -363,16 +363,45 @@ def is_Series_call_unkn(n: ast.AST) -> Optional[SeriesCall]:
   if not isinstance(n, ast.Call):
     return None
 
+class ApplyOrMap:
+  def __init__(self, call_name: CallOnName) -> None:
+    self.call_name = call_name
+    assert call_name.attr_call.get_func() in {"apply", "map"}
+  
+  def get_func_to_call(self) -> str:
+    call = self.call_name.attr_call.call.get_obj()
+    assert len(call.args) >= 1
+    arg0 = call.args[0]
+    assert isinstance(arg0, ast.Name)
+    return arg0.id
+
+
+def is_apply_or_map_on_name(attr_call: AttrCall) -> Optional[ApplyOrMap]:
+  func = attr_call.get_func()
+  if func not in {"map", "apply"}:
+    return None
+  # TODO - IMPORTANT: This is a hidden requirement.
+  # We should make that clearer in the structure of the code.
+  # It's not clear why having an ApplyOrMap requires that
+  # they're called on Name.
+  call_name = is_call_on_name(attr_call)
+  if call_name is None:
+    return None
+  call = attr_call.call.get_obj()
+  if not (len(call.args) >= 1):
+    return None
+  return ApplyOrMap(call_name=call_name)
+
 class HasSubstrSearchApply:
   # We could compute all the arguments instead of storing them, but it will be a lot of
   # horrible code.
-  def __init__(self, series_call: SeriesCall, compare: ast.Compare, dont_use_the_constructor_directly: bool) -> None:
-    self.series_call = series_call
+  def __init__(self, attr_call: AttrCall, compare: ast.Compare, dont_use_the_constructor_directly: bool) -> None:
+    self.attr_call = attr_call
     self.compare = compare
     assert _a(dont_use_the_constructor_directly)
 
     # Checks
-    func = series_call.attr_call.get_func()
+    func = attr_call.get_func()
     assert _a(func == "apply")
 
   def get_hay(self) -> Union[ast.Name, ast.Constant]:
@@ -409,40 +438,37 @@ class HasSubstrSearchApply:
 #                         body=Compare(left=Constant(value='G', kind=None), ops=[In], comparators=[Name(id='s')]))],
 #                 keywords=[]))],
 #     type_ignores=[])
-def has_substring_search_apply(series_call: SeriesCall) -> Optional[HasSubstrSearchApply]:
-  func = series_call.attr_call.get_func()
-  if func == "apply":
-    apply_Call = series_call.attr_call.call.get_obj()
-    assert isinstance(apply_Call, ast.Call)
-    args = apply_Call.args
-    if len(args) != 1:
-      return None
-    lambda_ = args[0]
-    if not isinstance(lambda_, ast.Lambda):
-      return None
-    arg0_str = lambda_has_only_one_arg(lambda_)
-    if arg0_str is None:
-      return None
-    compare = lambda_.body
-    if not isinstance(compare, ast.Compare):
-      return None
-    # TODO: Is this restrictive?
-    if (not isinstance(compare.left, ast.Constant) and
-        not isinstance(compare.left, ast.Name)):
-      return None
-    comparators = compare.comparators
-    if len(comparators) != 1:
-      return None
-    if (not isinstance(comparators[0], ast.Name) or
-        comparators[0].id != arg0_str):
-      return None
-    if (len(compare.ops) != 1 or not isinstance(compare.ops[0], ast.In)):
-      return None
+def has_substring_search_apply(attr_call: AttrCall) -> Optional[HasSubstrSearchApply]:
+  apply_Call = attr_call.call.get_obj()
+  if attr_call.get_func() != "apply":
+    return None
+  assert isinstance(apply_Call, ast.Call)
+  args = apply_Call.args
+  if len(args) != 1:
+    return None
+  lambda_ = args[0]
+  if not isinstance(lambda_, ast.Lambda):
+    return None
+  arg0_str = lambda_has_only_one_arg(lambda_)
+  if arg0_str is None:
+    return None
+  compare = lambda_.body
+  if not isinstance(compare, ast.Compare):
+    return None
+  # TODO: Is this restrictive?
+  if (not isinstance(compare.left, ast.Constant) and
+      not isinstance(compare.left, ast.Name)):
+    return None
+  comparators = compare.comparators
+  if len(comparators) != 1:
+    return None
+  if (not isinstance(comparators[0], ast.Name) or
+      comparators[0].id != arg0_str):
+    return None
+  if (len(compare.ops) != 1 or not isinstance(compare.ops[0], ast.In)):
+    return None
 
-    return HasSubstrSearchApply(series_call=series_call, compare=compare, dont_use_the_constructor_directly=True)
-
-
-  return None
+  return HasSubstrSearchApply(attr_call=attr_call, compare=compare, dont_use_the_constructor_directly=True)
 
 class IsInplaceUpdate:
   # Ironically, I thank this article: https://towardsdatascience.com/why-you-should-probably-never-use-pandas-inplace-true-9f9f211849e4
@@ -542,35 +568,6 @@ def has_tolist_concat_toSeries(call_name: CallOnName) -> Optional[HasToListConca
   return HasToListConcatToSeries(enclosed_call=enclosed_call, left_ser_call=left_ser_call,
                                   right_ser_call=right_ser_call,
                                   dont_use_the_constructor_directly=True)
-
-def series_call_patts(series_call: SeriesCall) -> Optional[Union[HasSubstrSearchApply, IsInplaceUpdate]]:
-  substr_apply: Optional[HasSubstrSearchApply] = has_substring_search_apply(series_call)
-  if substr_apply is not None:
-    return substr_apply
-
-  if (series_call.attr_call.call.is_enclosed_attr()):
-    assign = series_call.attr_call.call.get_encloser()
-    if isinstance(assign, ast.Assign):
-      # Assert that the Call is in the .value
-      assert series_call.attr_call.call.get_access_attr() == "value"
-      assert isinstance(series_call.attr_call.call.get_obj(), ast.Call)
-      inplace_update = is_inplace_update(assign, series_call)
-      if inplace_update is not None:
-        return inplace_update
-
-  return None
-
-class ApplyOrMap:
-  def __init__(self, call_name: CallOnName) -> None:
-    self.call_name = call_name
-    assert call_name.attr_call.get_func() in {"apply", "map"}
-  
-  def get_func_to_call(self) -> str:
-    call = self.call_name.attr_call.call.get_obj()
-    assert len(call.args) >= 1
-    arg0 = call.args[0]
-    assert isinstance(arg0, ast.Name)
-    return arg0.id
 
 class ApplyVectorizedLambda:
   def __init__(self, apply_call: AttrCall,
@@ -747,22 +744,6 @@ def can_be_vectorized_lambda(lam: ast.Lambda, attr_call: AttrCall) -> Optional[A
                                lam=lam,
                                arg0_name=arg_name,
                                called_on_name=called_on_name)
-
-def is_apply_or_map(attr_call: AttrCall) -> Optional[Union[ApplyOrMap, ApplyVectorizedLambda]]:
-  func = attr_call.get_func()
-  if func not in {"map", "apply"}:
-    return None
-  # TODO - IMPORTANT: This is a hidden requirement.
-  # We should make that clearer in the structure of the code.
-  # It's not clear why having an ApplyOrMap requires that
-  # they're called on Name.
-  call_name = is_call_on_name(attr_call)
-  if call_name is None:
-    return None
-  call = attr_call.call.get_obj()
-  if not (len(call.args) >= 1):
-    return None
-  return ApplyOrMap(call_name=call_name)
 
 class RemoveAxis1Lambda:
   def __init__(self, call_name: CallOnName, lam: ast.Lambda, 
@@ -1493,9 +1474,12 @@ def recognize_pattern(stmt: ast.stmt) ->  Optional[Single_Stmt_Patts]:
         fuse_apply = is_fuse_apply(attr_call)
         if fuse_apply is not None:
           return fuse_apply
+        substr_apply: Optional[HasSubstrSearchApply] = has_substring_search_apply(attr_call)
+        if substr_apply is not None:
+          return substr_apply
         # TODO: Should be able to factor these and the following
         # because this tests for an AttrCall.
-        apply_call = is_apply_or_map(attr_call)
+        apply_call = is_apply_or_map_on_name(attr_call)
         if isinstance(apply_call, ApplyOrMap):
           # TODO: These are overlapping. And this is the first
           # instance that tells us that we should support giving
@@ -1528,9 +1512,15 @@ def recognize_pattern(stmt: ast.stmt) ->  Optional[Single_Stmt_Patts]:
 
         series_call: Optional[SeriesCall] = is_Series_call(attr_call)
         if series_call is not None:
-          ser_call_patt = series_call_patts(series_call)
-          if ser_call_patt is not None:
-            return ser_call_patt
+          if (attr_call.call.is_enclosed_attr()):
+            assign = attr_call.call.get_encloser()
+            if isinstance(assign, ast.Assign):
+              # Assert that the Call is in the .value
+              assert attr_call.call.get_access_attr() == "value"
+              assert isinstance(attr_call.call.get_obj(), ast.Call)
+              inplace_update = is_inplace_update(assign, series_call)
+              if inplace_update is not None:
+                return inplace_update
 
         sort_head = is_sort_head(attr_call)
         if sort_head is not None:

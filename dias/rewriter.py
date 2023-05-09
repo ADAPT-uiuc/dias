@@ -709,7 +709,7 @@ def rewrite_and_exec(cell_ast: ast.Module, ipython: InteractiveShell) -> Tuple[s
       # Similar to SortHead
 
       lam_arg = "_DIAS_x"
-      apply_call = patt.series_call.attr_call
+      apply_call = patt.attr_call
       orig_called_on = apply_call.get_called_on()
       apply_call.set_called_on(AST_name(lam_arg))
       orig_called_on_replaced = apply_call.call.get_obj()
