@@ -351,6 +351,8 @@ def _DIAS_apply(self, func: AggFuncType, axis: Axis = 0, raw: bool = False,
     if has_only_math__preconds(self, default_args, subs, external_names, ip):
       end_overhead()
       return func(self)
+
+  end_overhead()
   return default()
 
 
