@@ -231,6 +231,7 @@ def _DIAS_apply(self, func: AggFuncType, axis: Axis = 0, raw: bool = False,
   default_call = functools.partial(_DIAS_save_pandas_apply, self, func, axis, raw, result_type, args, **kwargs)
 
   def end_overhead():
+    global _DIAS_apply_overhead_ns
     overhead_end = time.perf_counter_ns()
     _DIAS_apply_overhead_ns = overhead_end - overhead_start
 
