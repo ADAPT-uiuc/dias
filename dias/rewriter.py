@@ -13,6 +13,7 @@ import numpy as np
 import functools
 import copy
 from enum import Enum
+import warnings
 
 from pandas._typing import AggFuncType, Axis
 
@@ -1461,6 +1462,10 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
 # call_rewrite() from Dias.
 _inside_dias = False
 
+def rewrite_ast_from_source(cell):
+  cell_ast = ast.parse(cell)
+  return rewrite_ast(cell_ast)
+
 def rewrite(verbose: str, cell: str,
             # If true, this function returns stats, otherwise
             # it returns None. 
@@ -1471,12 +1476,7 @@ def rewrite(verbose: str, cell: str,
   # TODO: Is this a good idea or we should ask it every time we want to use it?
   ipython = get_ipython()
 
-  # Note: `cell` has the raw source code, but it doesn't include %%rewrite
-  # dbg_print("--------- Original AST -----------")
-  cell_ast = ast.parse(cell)
-  # dbg_print(astor.dump(cell_ast))
-  # dbg_print("--------- Modify AST -----------")
-  new_source, hit_stats = rewrite_ast(cell_ast)
+  new_source, hit_stats = rewrite_ast_from_source(cell)
   start = time.perf_counter_ns()
   ipython.run_cell(new_source)
   end = time.perf_counter_ns()
@@ -1574,4 +1574,9 @@ dias.rewriter.rewrite("{verbose}",
   return res
 
 ip = get_ipython()
-ip.input_transformers_cleanup.append(call_rewrite)
+if ip is None:
+  text = "IPython instance has not been detected. Dias won't rewrite cells \
+by default and can only be used as a library."
+  warnings.warn(text)
+else:
+  ip.input_transformers_cleanup.append(call_rewrite)
