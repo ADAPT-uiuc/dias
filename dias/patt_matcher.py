@@ -769,7 +769,62 @@ def can_remove_axis_1(tree: ast.AST, arg0_name: str) -> Tuple[bool, str]:
   if isinstance(tree, ast.Name):
     return False, ""
 
+  # We don't allow many nodes, but that's ok because usually the functions
+  # are simple. In particular, we don't allow Calls and Attributes.
+  # Calls can do arbitrary things, e.g., by calling eval. Attributes can
+  # access in pretty weird ways.
+
+  allowed_nodes = {
+    # Statements
+    ast.Return, ast.Assign, ast.For, ast.While,
+    ast.If, ast.Pass, ast.Break, ast.Continue,
+    # Expressions
+    ast.BoolOp, ast.BinOp, ast.UnaryOp, ast.IfExp,
+    ast.Dict, ast.Set, ast.Compare,
+    ast.Constant, ast.Subscript,
+    ast.Name, ast.List, ast.Tuple, ast.Slice,
+    # Contexts
+    ast.Load
+  }
+
+  # Simple short strings. Simple string comparison should work, we should
+  # not have to compare ASTs.
+  allowed_calls = {
+    "pd.Series",
+    "print"
+  }
+
+  checked = set()
+
   for n in ast.walk(tree):
+    if n in checked:
+      continue
+    type_n = type(n)
+    if type_n not in allowed_nodes:
+      # We allow certain calls that we know don't do weird things.
+      # The problem with calls is that they can do arbitrary things.
+      # In particular, eval() can execute arbitrary, runtime-generated
+      # code.
+
+      if type_n != ast.Call:
+        return False, ""
+      found_match = False
+      for al_call in allowed_calls:
+        stringified = astor.to_source(n.func)
+        if stringified.strip() == al_call:
+          found_match = True
+          break
+      # END FOR #
+      if not found_match:
+        return False, ""
+      for sub_n in ast.walk(n.func):
+        checked.add(sub_n)
+    # END if not in allowed #
+
+    if type_n == ast.Name:
+      if n.id != arg0_name:
+        return False, ""
+
     # NOTE: We don't want to allow appearances of arg0_name that is not in a
     # CompatSub. A Name can't appear on its own, i.e., without an encloser.
     # It will have to be at least inside an Expr. So, we are checking
