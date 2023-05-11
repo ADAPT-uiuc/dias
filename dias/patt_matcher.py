@@ -753,6 +753,24 @@ class RemoveAxis1Lambda:
     self.the_one_series = the_one_series
 
 def can_remove_axis_1(tree: ast.AST, arg0_name: str) -> Tuple[bool, str]:
+  if type(tree) == ast.FunctionDef:
+    # TODO: This is duplicated code, similar to the main body.
+    # We should either find a workaround so that we can treat
+    # tree.body as an AST node (it's not, and that's the problem;
+    # we can't call ast.walk() on it) or put it in a function.
+
+    the_one_series = None
+    for stmt in tree.body:
+      can, the_series = can_remove_axis_1(stmt, arg0_name)
+      if not can:
+        return False, ""
+      if the_one_series is not None and the_one_series != the_series:
+        return False, ""
+      the_one_series = the_series
+    # END FOR #
+    if the_one_series == None:
+      return False, ""
+    return True, the_one_series
   # Check that all the times the arg0_name appears, it is in a subscript
   # and check that all these subscripts access the same Series.
   # NOTE: If we have other subscripts, on different names, then
