@@ -1443,8 +1443,10 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
 # call_rewrite() from Dias.
 _inside_dias = False
 
-
-def rewrite(verbose: str, cell: str):
+def rewrite(verbose: str, cell: str,
+            # If true, this function returns stats, otherwise
+            # it returns None. 
+            ret_stats: bool = False):
   global _inside_dias
   _inside_dias = True
 
@@ -1484,23 +1486,29 @@ def rewrite(verbose: str, cell: str):
 """))
 
   # Create the JSON.
-  if _IREWR_JSON_STATS:
-    eprint("[IREWRITE JSON]")
-    json_out = dict()
+  stats = None
+  if _IREWR_JSON_STATS or ret_stats:
+    stats = dict()
     # NOTE: The original and modified codes might be the same but because the modified code was round-tripped
     # using astor, the strings might not be the same. If you want to test for equality, don't
     # just compare the two strings. Rather, round-trip the original source too and then test.
-    json_out['raw'] = cell
-    json_out['modified'] = new_source
-    json_out['patts-hit'] = hit_stats
+    stats['raw'] = cell
+    stats['modified'] = new_source
+    stats['patts-hit'] = hit_stats
     # In ns.
-    json_out['rewritten-exec-time'] = nb_utils.ns_to_ms(time_spent_in_exec)
-    dumped_stats = json.dumps(json_out, indent=2)
+    stats['rewritten-exec-time'] = nb_utils.ns_to_ms(time_spent_in_exec)
+
+  # TODO: _IREWR_JSON_STATS should go away now that we can return the stats
+  # from this function and we don't have to print, the parse and all this
+  # hackery. But this requires changing the testing infra too.
+  if _IREWR_JSON_STATS:
+    eprint("[IREWRITE JSON]")
+    dumped_stats = json.dumps(stats, indent=2)
     eprint(dumped_stats)
     eprint("[IREWRITE END JSON]")
 
   _inside_dias = False
-  return None
+  return (stats if ret_stats else None)
 
 def call_rewrite(lines: List[str]):
   cell = ''.join(lines)
