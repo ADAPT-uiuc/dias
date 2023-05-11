@@ -1444,7 +1444,7 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
 _inside_dias = False
 
 
-def rewrite(line: str, cell: str):
+def rewrite(verbose: str, cell: str):
   global _inside_dias
   _inside_dias = True
 
@@ -1461,7 +1461,7 @@ def rewrite(line: str, cell: str):
   ipython.run_cell(new_source)
   end = time.perf_counter_ns()
   time_spent_in_exec = end-start
-  if line.strip() == "verbose":
+  if verbose.strip() == "verbose":
     if not len(hit_stats):
       if not is_notebook_env():
         print("### Dias did not rewrite code")
