@@ -210,20 +210,33 @@ class _DIAS_ApplyPat(Enum):
   RemoveAxis1 = 2,
   HasOnlyMath = 3
 
-# _DIAS_apply() can't notify outsiders, including the rewriter itself, that it
-# rewrites code, because the rewrite doesn't happen through the rewrite() (i.e.,
-# externally). This variable is a hack around that. If we need to see whether
-# one of the apply() patterns hit in an arbitrary piece of code, we set this
-# variable to None, run the code, and then check it again.
+# _DIAS_apply() can't notify outsiders, including the rewriter itself, because
+# the rewrite doesn't happen through the rewrite() (i.e., externally). These
+# variables are a hack around that. If we need to see whether one of the apply()
+# patterns hit, or how much overhead the apply() rewrites added in an arbitrary
+# piece of code, we reset these variables, run the code, and check them again.
 _DIAS_apply_pat : _DIAS_ApplyPat | None = None
+_DIAS_apply_overhead_ns = 0
 
 _DIAS_save_pandas_apply = pd.DataFrame.apply
 def _DIAS_apply(self, func: AggFuncType, axis: Axis = 0, raw: bool = False, 
                 result_type: Literal["expand", "reduce", "broadcast"] | None = None,
                 args=(), **kwargs):
+  global _DIAS_apply_pat, _DIAS_apply_overhead_ns
   assert isinstance(self, pd.DataFrame)
 
-  default = functools.partial(_DIAS_save_pandas_apply, self, func, axis, raw, result_type, args, **kwargs)
+  overhead_start = time.perf_counter_ns()
+
+  default_call = functools.partial(_DIAS_save_pandas_apply, self, func, axis, raw, result_type, args, **kwargs)
+
+  def end_overhead():
+    overhead_end = time.perf_counter_ns()
+    _DIAS_apply_overhead_ns = overhead_end - overhead_start
+
+  def default():
+    end_overhead()
+    return default_call()
+
   
   # If any of the args after `axis` is not the default, bail.
   if raw != False or result_type != None:
@@ -307,6 +320,9 @@ def _DIAS_apply(self, func: AggFuncType, axis: Axis = 0, raw: bool = False,
     # Python gave me a hard time, so I did the easy way.
     np_select_call = vec__build_np_select(cond_value_pairs, else_val)
     np_select_asgn = AST_assign(np_select_res, np_select_call)
+    
+    end_overhead()
+
     ip.run_cell(astor.to_source(np_select_asgn))
     return ip.user_ns[np_select_res_id]
 
@@ -316,6 +332,7 @@ def _DIAS_apply(self, func: AggFuncType, axis: Axis = 0, raw: bool = False,
   can_remove, the_one_series = patt_matcher.can_remove_axis_1(func_ast, arg0_name)
   if can_remove:
     _DIAS_apply_pat = _DIAS_ApplyPat.RemoveAxis1
+    end_overhead()
     return remove_axis_1(self, mod_ast, func_ast, arg0_name, the_one_series)
   
   ### ApplyHasOnlyMath ###
@@ -330,6 +347,7 @@ def _DIAS_apply(self, func: AggFuncType, axis: Axis = 0, raw: bool = False,
     default_args = func_ast.args.defaults
     ip = get_ipython()
     if has_only_math__preconds(self, default_args, subs, external_names, ip):
+      end_overhead()
       return func(self)
   return default()
 
