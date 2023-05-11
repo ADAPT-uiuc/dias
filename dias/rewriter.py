@@ -12,6 +12,7 @@ import pandas as pd
 import numpy as np
 import functools
 import copy
+from enum import Enum
 
 from pandas._typing import AggFuncType, Axis
 
@@ -203,6 +204,19 @@ def remove_axis_1(df, mod_ast, func_ast, arg0_name, the_one_series):
   return df[the_one_series].apply(ip.user_ns[new_func_name])
 
 ## apply() overwrite ##
+
+class _DIAS_ApplyPat(Enum):
+  Vectorized = 1,
+  RemoveAxis1 = 2,
+  HasOnlyMath = 3
+
+# _DIAS_apply() can't notify outsiders, including the rewriter itself, that it
+# rewrites code, because the rewrite doesn't happen through the rewrite() (i.e.,
+# externally). This variable is a hack around that. If we need to see whether
+# one of the apply() patterns hit in an arbitrary piece of code, we set this
+# variable to None, run the code, and then check it again.
+_DIAS_apply_pat : _DIAS_ApplyPat | None = None
+
 _DIAS_save_pandas_apply = pd.DataFrame.apply
 def _DIAS_apply(self, func: AggFuncType, axis: Axis = 0, raw: bool = False, 
                 result_type: Literal["expand", "reduce", "broadcast"] | None = None,
@@ -241,6 +255,7 @@ def _DIAS_apply(self, func: AggFuncType, axis: Axis = 0, raw: bool = False,
   ### ApplyVectorized ###
 
   if patt_matcher.can_be_vectorized_func(func_ast):
+    _DIAS_apply_pat = _DIAS_ApplyPat.Vectorized
     # We need to introduce an ast.Name, the `called_on`. Say we transform this:
     #   def foo(row):
     #     if row['A'] == 1:
@@ -300,6 +315,7 @@ def _DIAS_apply(self, func: AggFuncType, axis: Axis = 0, raw: bool = False,
 
   can_remove, the_one_series = patt_matcher.can_remove_axis_1(func_ast, arg0_name)
   if can_remove:
+    _DIAS_apply_pat = _DIAS_ApplyPat.RemoveAxis1
     return remove_axis_1(self, mod_ast, func_ast, arg0_name, the_one_series)
   
   ### ApplyHasOnlyMath ###
@@ -308,6 +324,7 @@ def _DIAS_apply(self, func: AggFuncType, axis: Axis = 0, raw: bool = False,
   buf_set = set()
   all_arg_names = [arg.arg for arg in func_ast.args.args]
   if patt_matcher.has_only_math(func_ast, all_arg_names, subs=buf_list, external_names=buf_set):
+    _DIAS_apply_pat = _DIAS_ApplyPat.HasOnlyMath
     subs = buf_list
     external_names = buf_set
     default_args = func_ast.args.defaults
