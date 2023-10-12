@@ -1667,34 +1667,36 @@ def patt_match(body: List[ast.stmt], return_apply=False) -> List[Tuple[Available
       else:
         split_patt = patt
         next_stmt_idx = stmt_idx + 1
-        index_patt = single_stmt_patts[next_stmt_idx]
-        if isinstance(index_patt, StrAttrIndexed):
-          # Make sure they're operating on the same obj
-          # Both should be CompatSub
-          lhs_split = is_compatible_sub(split_patt.lhs_obj)
-          assert lhs_split is not None
-          rhs_index = index_patt.series
-          if compat_sub_eq(lhs_split, rhs_index):
-            new_patt = \
-              FusableStrSplit(
-                source_split=split_patt,
-                index=index_patt.index,
-                expr_to_replace=index_patt.encl_sub)
-            res.append((new_patt, [stmt_idx, next_stmt_idx]))
-            stmt_idx = next_stmt_idx
+        if next_stmt_idx < len(single_stmt_patts):
+          index_patt = single_stmt_patts[next_stmt_idx]
+          if isinstance(index_patt, StrAttrIndexed):
+            # Make sure they're operating on the same obj
+            # Both should be CompatSub
+            lhs_split = is_compatible_sub(split_patt.lhs_obj)
+            assert lhs_split is not None
+            rhs_index = index_patt.series
+            if compat_sub_eq(lhs_split, rhs_index):
+              new_patt = \
+                FusableStrSplit(
+                  source_split=split_patt,
+                  index=index_patt.index,
+                  expr_to_replace=index_patt.encl_sub)
+              res.append((new_patt, [stmt_idx, next_stmt_idx]))
+              stmt_idx = next_stmt_idx
     elif isinstance(patt, SubToSubReplace):
       replace_patt = patt
       next_stmt_idx = stmt_idx + 1
-      unique_patt = single_stmt_patts[next_stmt_idx]
-      if (isinstance(unique_patt, UniqueOnSub) and
-          compat_sub_eq(replace_patt.lhs_sub, unique_patt.sub)):
-        new_patt = \
-          FusableReplaceUnique(replace_on_sub=replace_patt.rhs_sub,
-                               replace_lhs_sub=replace_patt.lhs_sub,
-                               replace_arg=replace_patt.replace_arg,
-                               expr_to_replace=unique_patt.expr_to_replace)
-        res.append((new_patt, [stmt_idx, next_stmt_idx]))
-        stmt_idx = next_stmt_idx
+      if next_stmt_idx < len(single_stmt_patts):
+        unique_patt = single_stmt_patts[next_stmt_idx]
+        if (isinstance(unique_patt, UniqueOnSub) and
+            compat_sub_eq(replace_patt.lhs_sub, unique_patt.sub)):
+          new_patt = \
+            FusableReplaceUnique(replace_on_sub=replace_patt.rhs_sub,
+                                replace_lhs_sub=replace_patt.lhs_sub,
+                                replace_arg=replace_patt.replace_arg,
+                                expr_to_replace=unique_patt.expr_to_replace)
+          res.append((new_patt, [stmt_idx, next_stmt_idx]))
+          stmt_idx = next_stmt_idx
     else:
       res.append((patt, [stmt_idx]))
 
