@@ -1460,6 +1460,7 @@ Union[
   HasSubstrSearchApply,
   IsInplaceUpdate,
   HasToListConcatToSeries,
+  ApplyVectorizedLambda,
   RemoveAxis1Lambda,
   IsTrivialDFCall,
   IsTrivialDFAttr,
@@ -1469,6 +1470,7 @@ Union[
   ReplaceRemoveList,
   MultipleStrInCol,
   FuseIsIn,
+  FuseApply,
   StrSplitPython,
   StrAttrIndexed,
   SubToSubReplace
