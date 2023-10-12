@@ -1479,7 +1479,7 @@ Union[
   StrAttrIndexed,
   SubToSubReplace
 ]
-def recognize_pattern(stmt: ast.stmt) ->  Optional[Single_Stmt_Patts]:
+def recognize_pattern(stmt: ast.stmt, return_apply=False) ->  Optional[Single_Stmt_Patts]:
   # Start with the trivial patterns.
   # NOTE: Those should generally match top-level Expr's. Be careful
   # if you try to put them in the walk() below.
@@ -1570,6 +1570,9 @@ def recognize_pattern(stmt: ast.stmt) ->  Optional[Single_Stmt_Patts]:
             vec_lam = can_be_vectorized_lambda(lam, attr_call)
             if vec_lam is not None:
               return vec_lam
+
+          if return_apply:
+            return apply_call
         elif isinstance(apply_call, ApplyVectorizedLambda):
           return apply_call
 
@@ -1632,7 +1635,7 @@ Union[
 # Returns a list of matched patterns, along with a list of indexes (in the input
 # list) of all the statements that take part in the pattern.
 # It matches the biggest possible pattern. The patterns don't overlap.
-def patt_match(body: List[ast.stmt]) -> List[Tuple[Available_Patterns, List[int]]]:
+def patt_match(body: List[ast.stmt], return_apply=False) -> List[Tuple[Available_Patterns, List[int]]]:
   res: List[Tuple[Available_Patterns, List[int]]] = []
 
   single_stmt_patts: List[Single_Stmt_Patts] = []
