@@ -1640,7 +1640,7 @@ def patt_match(body: List[ast.stmt], return_apply=False) -> List[Tuple[Available
 
   single_stmt_patts: List[Single_Stmt_Patts] = []
   for stmt_idx, stmt in enumerate(body):
-    patt = recognize_pattern(stmt)
+    patt = recognize_pattern(stmt, return_apply)
     single_stmt_patts.append(patt)
   assert len(single_stmt_patts) == len(body)
 
