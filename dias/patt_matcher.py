@@ -582,8 +582,8 @@ class ApplyVectorizedLambda:
 def lambda_has_only_one_arg(l: ast.Lambda) -> Optional[str]:
   args = l.args
   assert isinstance(args, ast.arguments)
-  # Should have only one argument for either axis=1 or 0
-  assert len(args.args) == 1
+  if len(args.args) != 1:
+    return None
   # All these should be empty for simplicity.
   should_be_empty = \
     ["posonlyargs", "kwonlyargs", "kw_defaults", "defaults"]
