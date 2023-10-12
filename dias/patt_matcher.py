@@ -367,13 +367,6 @@ class ApplyOrMap:
   def __init__(self, call_name: CallOnName) -> None:
     self.call_name = call_name
     assert call_name.attr_call.get_func() in {"apply", "map"}
-  
-  def get_func_to_call(self) -> Optional[str]:
-    call = self.call_name.attr_call.call.get_obj()
-    assert len(call.args) >= 1
-    arg0 = call.args[0]
-    assert isinstance(arg0, ast.Name)
-    return arg0.id
 
 
 def is_apply_or_map_on_name(attr_call: AttrCall) -> Optional[ApplyOrMap]:
