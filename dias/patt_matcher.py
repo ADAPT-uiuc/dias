@@ -865,24 +865,25 @@ def can_remove_axis_1(tree: ast.AST, arg0_name: str) -> Tuple[bool, str]:
     return False, ""
   return True, the_one_series
 
-def is_remove_axis_1_lambda(apply_call: ApplyOrMap) -> Optional[RemoveAxis1Lambda]:
-  call_name = apply_call.call_name
-  call = call_name.attr_call.call.get_obj()
-  if call_name.attr_call.get_func() != "apply":
-    return None
-  keywords = call.keywords
-  has_axis_1 = False
+def has_axis_1(keywords):
   for kw in keywords:
     if kw.arg == "axis":
       value = kw.value
       # IMPORTANT - TODO: Can also be axis = 'columns'. Same thing.
       if isinstance(value, ast.Constant) and value.value == 1:
-        has_axis_1 = True
-        break
-      else:
-        return None
+        return True
+      else: # Other value, we don't handle that
+        return False
+  # END FOR #
+  return False
+
+def is_remove_axis_1_lambda(apply_call: ApplyOrMap) -> Optional[RemoveAxis1Lambda]:
+  call_name = apply_call.call_name
+  call = call_name.attr_call.call.get_obj()
+  if call_name.attr_call.get_func() != "apply":
+    return None
   
-  if not has_axis_1:
+  if not has_axis_1(call.keywords):
     return None
   
   if len(call.args) != 1:
