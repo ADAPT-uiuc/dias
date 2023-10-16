@@ -160,7 +160,7 @@ def AST_try_except(try_block: List[ast.stmt],
   ast.Try(
     body=try_block,
     finalbody=[],
-    handlers=[ast.ExceptHandler(body=except_block)],
+    handlers=[ast.ExceptHandler(body=except_block, type=AST_name("KeyError"))],
     orelse=[]
   )
 
@@ -1211,15 +1211,10 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
       )
 
       # The argument to replace() should be a dict
-      precond_is_dict = \
-      AST_cmp(
-        lhs=AST_call(
-          func=AST_name("type"),
-          args=[patt.replace_arg]
-        ),
-        rhs=AST_name("dict"),
-        op=ast.Eq()
-      )
+      precond_is_dict = AST_call(
+          func=AST_name("isinstance"),
+          args=[patt.replace_arg, AST_name("dict")]
+        )
       preconditions = \
         AST_bool_and(precond_is_series, precond_is_dict)
 
