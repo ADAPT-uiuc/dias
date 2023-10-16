@@ -380,9 +380,9 @@ def sort_head(called_on, by: str | None, n: int, asc: bool, orig: Callable):
 
 def substr_search_apply(ser, needle: str, orig: Callable):
   if type(ser) == pd.Series:
-    _DIAS_ls = ser.tolist()
-    _DIAS_res = [(needle in s) for s in _DIAS_ls]
-    return pd.Series(_DIAS_res, index=ser.index)
+    ls = ser.tolist()
+    res = [(needle in s) for s in ls]
+    return pd.Series(res, index=ser.index)
   else:
     return orig(ser)
 
