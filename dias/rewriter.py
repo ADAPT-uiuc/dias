@@ -1364,7 +1364,7 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
       # Create a function. We'll add our code there, along with precondition
       # checks and we'll replace the apply() with a call to this function.
 
-      the_series = AST_name("_REWR_ser")
+      the_series = AST_name("ser")
 
       # We will only allow it to be a Series because otherwise
       # we have many cases on how to translate it into a loop.
@@ -1380,22 +1380,22 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
 
       ### Generate loop ###
 
-      loop_res = AST_name("_REWR_res")
+      loop_res = AST_name("res")
       loop_res_init = AST_assign(loop_res, ast.List(elts=[]))
 
       # Name for the loop iterator.
-      loop_it = AST_name("_REWR_it")
-      # _REWR_ls = <obj>.tolist()
-      ls_name = AST_name("_REWR_ls")
+      loop_it = AST_name("it")
+      # ls = <obj>.tolist()
+      ls_name = AST_name("ls")
       ls = AST_assign(ls_name, AST_attr_call(called_on=the_series, name="tolist"))
 
-      left_res = AST_name("_REWR_left")
+      left_res = AST_name("left")
       left_call = call_function_and_assign_result(
         assign_to=left_res,
         function=left_arg0, arg=loop_it
       )
 
-      right_res = AST_name("_REWR_right")
+      right_res = AST_name("right")
       right_call = call_function_and_assign_result(
         assign_to=right_res,
         function=right_arg0,
@@ -1428,7 +1428,11 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
         )
 
       # Create the function
-      fused_apply_func_name = "_REWR_fused_apply"
+      fused_apply_func_name = "fused_apply"
+      # Check if it's already in use
+      if fused_apply_func_name in globals():
+        fused_apply_func_name = "_REWR_fused_apply"
+        assert fused_apply_func_name not in globals()
       fused_apply_func = AST_function_def(fused_apply_func_name,
                                    args=[the_series], body=[conditioned])
       # Insert before the current (top-level) statement
