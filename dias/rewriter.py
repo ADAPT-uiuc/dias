@@ -1576,7 +1576,9 @@ dias.rewriter.rewrite("{verbose}",
   return res
 
 ip = get_ipython()
-if ip is None:
+os.environ["_IREWR_USE_AS_LIB"] = "True"
+use_as_lib = "_IREWR_USE_AS_LIB" in os.environ and os.environ["_IREWR_USE_AS_LIB"] == "True"
+if ip is None or use_as_lib:
   text = "IPython instance has not been detected. Dias won't rewrite cells \
 by default and can only be used as a library."
   warnings.warn(text)
