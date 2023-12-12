@@ -1056,23 +1056,25 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
       stmt_idx = stmt_idxs[0]
       stmt_list = list_of_lists[stmt_idx]
 
-      tmp = AST_name("_DIAS_fuseisin")
-
       original_binop = copy.deepcopy(patt.binop_encl.get_obj())
 
       call = patt.the_call
       call.args[0] = ast.BinOp(left=patt.left_name, op=ast.Add(), right=patt.right_name)
   
-      precond_is_DataFrame = wrap_in_if(
-        obj=AST_name(patt.df_name),
-        ty="pd.DataFrame",
-        then=[AST_assign(tmp, original_binop)],
-        else_=[AST_assign(tmp, call)]
+      precond_is_DataFrame = AST_cmp(
+        lhs=AST_call(
+          func=AST_name("type"),
+          args=[AST_name(patt.df_name)]
+        ),
+        rhs=AST_attr_chain("pd.DataFrame"),
+        op=ast.Eq()
       )
 
-      patt.binop_encl.set_enclosed_obj(tmp) 
-
-      stmt_list.insert(0, precond_is_DataFrame)
+      patt.binop_encl.set_enclosed_obj(ast.IfExp(
+        test=precond_is_DataFrame,
+        body=call,
+        orelse=original_binop
+      )) 
       
       stats[type(patt).__name__] = 1
     elif isinstance(patt, patt_matcher.StrSplitPython):

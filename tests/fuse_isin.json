@@ -26,7 +26,7 @@
     },
     {
       "raw":"\nour = df.loc[(df['Industry'].isin(env)) | (df['Industry'].isin(ai))].reset_index(drop=True,inplace=False)\n",
-      "modified":"if type(df) != pd.DataFrame:\n    _DIAS_fuseisin = df['Industry'].isin(env) | df['Industry'].isin(ai)\nelse:\n    _DIAS_fuseisin = df['Industry'].isin(env + ai)\nour = df.loc[_DIAS_fuseisin].reset_index(drop=True, inplace=False)\n",
+      "modified":"our = df.loc[df['Industry'].isin(env + ai) if type(df) == pd.DataFrame else\n    df['Industry'].isin(env) | df['Industry'].isin(ai)].reset_index(drop=\n    True, inplace=False)\n",
       "patts-hit":{
         "FuseIsIn":1
       },
