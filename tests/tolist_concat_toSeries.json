@@ -9,7 +9,7 @@
       "rewritten-exec-time":2.36359
     },
     {
-      "raw":"\nour = pd.Series(df['Name'].tolist() + df['Name'].tolist())\n",
+      "raw":"\nour = pd.Series(df['Name'].tolist() + df['Ticket'].tolist())\n",
       "modified":"our = pd.concat([df['Name'], df['Ticket']], ignore_index=True\n    ) if pd == pandas and (type(df['Name']) == pd.Series and type(df[\n    'Ticket']) == pd.Series) else pd.Series(df['Name'].tolist() + df[\n    'Ticket'].tolist())\n",
       "patts-hit":{
         "HasToListConcatToSeries":1
