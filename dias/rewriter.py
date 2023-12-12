@@ -385,6 +385,11 @@ def substr_search_apply(ser, needle: str, orig: Callable):
     return pd.Series(res, index=ser.index)
   else:
     return orig(ser)
+  
+def concat_list_to_series(library, e1, e2):
+  if library == pd and type(e1) == pd.Series and type(e2) == pd.Series:
+    return pd.concat([e1, e2], ignore_index=True)
+  return pd.Series(e1.tolist() + e2.tolist())
 
 def rewrite_enclosed_sub(enclosed_sub, arg0_name, the_one_series):
   sub = enclosed_sub.get_obj()
@@ -780,60 +785,18 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
       stats[type(patt).__name__] = 1
     elif isinstance(patt, patt_matcher.HasToListConcatToSeries):
       # Pass for now
-      pd_Series_call = patt.enclosed_call.get_obj()
-      # Change the call to concat.
-      pd_concat_call = copy.deepcopy(pd_Series_call)
-      pd_concat_call.func.attr = 'concat'
-      left_df = patt.left_ser_call.get_sub().get_df()
-      left_ser = patt.left_ser_call.get_sub().get_Series()
-      right_df = patt.right_ser_call.get_sub().get_df()
-      right_ser = patt.right_ser_call.get_sub().get_Series()
 
-      # TODO: This is definitely incorrect usage of pd == pandas.
-      precond_is_pandas = AST_cmp(
-        lhs=pd_concat_call.func.value,
-        rhs=AST_name("pandas"),
-        op=ast.Eq()
-      )
-
-      precond_left_is_DataFrame = AST_cmp(
-        lhs=AST_call(
-          func=AST_name("type"),
-          args=[patt.left_ser_call.get_sub().get_sub_ast()]
-        ),
-        rhs=AST_attr_chain("pd.Series"),
-        op=ast.Eq()
-      )
-
-      precond_right_is_DataFrame = AST_cmp(
-        lhs=AST_call(
-          func=AST_name("type"),
-          args=[patt.right_ser_call.get_sub().get_sub_ast()]
-        ),
-        rhs=AST_attr_chain("pd.Series"),
-        op=ast.Eq()
-      )
-      
-      combined_preconds = AST_bool_and(
-        precond_is_pandas, 
-        AST_bool_and(
-          precond_left_is_DataFrame, 
-          precond_right_is_DataFrame
+      patt.enclosed_call.set_enclosed_obj(
+        AST_attr_call(
+          called_on=AST_attr_chain('dias.rewriter'),
+          name="concat_list_to_series",
+          keywords={
+            'library': patt.enclosed_call.get_obj().func.value, 
+            'e1': patt.left_ser_call.get_sub().get_sub_ast(), 
+            'e2': patt.right_ser_call.get_sub().get_sub_ast()
+          }
         )
       )
-
-      pd_concat_call.args[0] = \
-        ast.List(
-          elts=[ast.Subscript(value=ast.Name(id=left_df), slice=ast.Constant(value=left_ser)),
-                ast.Subscript(value=ast.Name(id=right_df), slice=ast.Constant(value=right_ser))]
-        )
-      pd_concat_call.keywords = [ast.keyword(arg="ignore_index", value=ast.Constant(value=True))]
-
-      patt.enclosed_call.set_enclosed_obj(ast.IfExp(
-        test=combined_preconds,
-        body=pd_concat_call,
-        orelse=pd_Series_call
-      ))
 
       stats[type(patt).__name__] = 1
     elif isinstance(patt, patt_matcher.SortHead):
