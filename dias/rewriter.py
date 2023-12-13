@@ -391,6 +391,11 @@ def concat_list_to_series(library, e1, e2):
     return pd.concat([e1, e2], ignore_index=True)
   return pd.Series(e1.tolist() + e2.tolist())
 
+def fuse_isin(df, col_name, s1, s2):
+  if type(df) == pd.DataFrame:
+    return df[col_name].isin(s1 + s2)
+  return df[col_name].isin(s1) | df[col_name].isin(s2)
+
 def rewrite_enclosed_sub(enclosed_sub, arg0_name, the_one_series):
   sub = enclosed_sub.get_obj()
   compat_sub = patt_matcher.is_compatible_sub(sub)
@@ -1015,29 +1020,18 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
 
       stats[type(patt).__name__] = 1
     elif isinstance(patt, patt_matcher.FuseIsIn):
-      assert len(stmt_idxs) == 1
-      stmt_idx = stmt_idxs[0]
-      stmt_list = list_of_lists[stmt_idx]
-
-      original_binop = copy.deepcopy(patt.binop_encl.get_obj())
-
-      call = patt.the_call
-      call.args[0] = ast.BinOp(left=patt.left_name, op=ast.Add(), right=patt.right_name)
-  
-      precond_is_DataFrame = AST_cmp(
-        lhs=AST_call(
-          func=AST_name("type"),
-          args=[AST_name(patt.df_name)]
-        ),
-        rhs=AST_attr_chain("pd.DataFrame"),
-        op=ast.Eq()
+      patt.binop_encl.set_enclosed_obj(
+        AST_attr_call(
+          called_on=AST_attr_chain('dias.rewriter'),
+          name="fuse_isin",
+          keywords={
+            'df': AST_name(patt.the_ser.get_sub().get_df()),
+            'col_name': ast.Constant(value=patt.the_ser.get_sub().get_Series()),
+            's1': patt.left_name, 
+            's2': patt.right_name
+          }
+        )
       )
-
-      patt.binop_encl.set_enclosed_obj(ast.IfExp(
-        test=precond_is_DataFrame,
-        body=call,
-        orelse=original_binop
-      )) 
       
       stats[type(patt).__name__] = 1
     elif isinstance(patt, patt_matcher.StrSplitPython):

@@ -1135,12 +1135,12 @@ class MultipleStrInCol:
 
 class FuseIsIn:
   def __init__(self, binop_encl: OptEnclosed[ast.BinOp], the_call: ast.Call,
-               left_name: ast.Name, right_name: ast.Name, df_name: str) -> None:
+               left_name: ast.Name, right_name: ast.Name, the_ser: SeriesCall) -> None:
     self.binop_encl = binop_encl
     self.the_call = the_call
     self.left_name = left_name
     self.right_name = right_name
-    self.df_name = df_name
+    self.the_ser = the_ser
 
 def is_fuse_isin(binop_encl: OptEnclosed[ast.BinOp]) -> Optional[FuseIsIn]:
   binop = binop_encl.get_obj()
@@ -1178,11 +1178,11 @@ def is_fuse_isin(binop_encl: OptEnclosed[ast.BinOp]) -> Optional[FuseIsIn]:
     return None
   # Any of the two
   the_call = left_call
-  df_name = left_ser.get_sub().get_df()
+  the_ser = left_ser
 
   return FuseIsIn(binop_encl=binop_encl, the_call=the_call,
                   left_name=left_name, right_name=right_name,
-                  df_name=df_name)
+                  the_ser=the_ser)
 
 def is_str_attr_on_sub(str_attr: ast.AST) -> Optional[CompatSub]:
   if (not isinstance(str_attr, ast.Attribute) or

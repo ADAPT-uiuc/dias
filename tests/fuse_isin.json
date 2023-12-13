@@ -26,7 +26,7 @@
     },
     {
       "raw":"\nour = df.loc[(df['Industry'].isin(env)) | (df['Industry'].isin(ai))].reset_index(drop=True,inplace=False)\n",
-      "modified":"our = df.loc[df['Industry'].isin(env + ai) if type(df) == pd.DataFrame else\n    df['Industry'].isin(env) | df['Industry'].isin(ai)].reset_index(drop=\n    True, inplace=False)\n",
+      "modified":"our = df.loc[dias.rewriter.fuse_isin(df=df, col_name='Industry', s1=env, s2=ai)\n    ].reset_index(drop=True, inplace=False)\n",
       "patts-hit":{
         "FuseIsIn":1
       },
