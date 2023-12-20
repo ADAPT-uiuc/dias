@@ -396,6 +396,11 @@ def fuse_isin(df, col_name, s1, s2):
     return df[col_name].isin(s1 + s2)
   return df[col_name].isin(s1) | df[col_name].isin(s2)
 
+def replace_remove_list(ser, orig_to_replace: str | List[str], orig_replace_with: str | List[str], to_replace: str, replace_with: str, orig_lambda: Callable):
+  if type(ser) == pd.DataFrame or type(ser) == pd.Series:
+    return orig_lambda(to_replace, replace_with)
+  return orig_lambda(orig_to_replace, orig_replace_with)
+
 def rewrite_enclosed_sub(enclosed_sub, arg0_name, the_one_series):
   sub = enclosed_sub.get_obj()
   compat_sub = patt_matcher.is_compatible_sub(sub)
@@ -936,30 +941,65 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
 
       stats[type(patt).__name__] = 1
     elif isinstance(patt, patt_matcher.ReplaceRemoveList):
-      # We can't process it until we know the function passed to apply().
-      # Save it as a deferred pattern.
+      """This rewrites `e.replace([x1], [x2], **kwargs)` as:
+      dias.rewriter.replace_remove_list(e, [x1], [x2], x1, x2, 
+        lambda _DIAS_x1, _DIAS_x2: e.replace(_DIAS_x1, _DIAS_x2, **kwargs))
+      """
       assert len(stmt_idxs) == 1
       stmt_idx = stmt_idxs[0]
       stmt_list = list_of_lists[stmt_idx]
-      
-      to_replace = patt.to_replace
-      replace_with = patt.replace_with
-      call_raw = patt.attr_call.call.get_obj()
-      call_raw.args[0] = to_replace
-      call_raw.args[1] = replace_with
 
-      if patt.inplace:
+      df_or_ser = patt.attr_call.get_called_on()
+
+      call_raw = patt.attr_call.call.get_obj()      
+      orig_to_replace = call_raw.args[0]
+      orig_replace_with = call_raw.args[1]
+
+      call_raw.args = [AST_name(name="_DIAS_x1"), AST_name(name="_DIAS_x2")]
+      
+      lambda_args = ast.arguments(
+        args=[
+          ast.arg(arg=AST_name(name="_DIAS_x1")),
+          ast.arg(arg=AST_name(name="_DIAS_x2"))
+        ],
+        defaults=[],
+        kw_defaults=[],
+        kwarg=None,
+        kwonlyargs=[],
+        posonlyargs=[],
+        vararg=None
+      )
+
+      orig_wrapped_in_lambda = ast.Lambda(args=lambda_args, body=call_raw)
+
+      new_replace_call = AST_attr_call(
+        called_on=AST_attr_chain('dias.rewriter'),
+        name="replace_remove_list",
+        args=[
+          ast.arg(arg=df_or_ser),
+          ast.arg(arg=orig_to_replace),
+          ast.arg(arg=orig_replace_with),
+          ast.arg(arg=patt.to_replace),
+          ast.arg(arg=patt.replace_with),
+          ast.arg(arg=orig_wrapped_in_lambda)
+        ]
+      )
+
+      if patt.inplace and patt.attr_call.call.get_encloser() == stmt_list[0]:
         # The parent of the call must be an assignment.
         # This assignment must be top-level because then we
         # can replace it in the stmt_list[]. Otherwise, we don't
         # know the parent of the assignment and if an assignment
         # is not top-level, we probably don't want to touch it
         # anyway.
-        if patt.attr_call.call.get_encloser() == stmt_list[0]:
-          # Add the inplace=True argument.
-          call_raw.keywords.append(
-            ast.keyword(arg="inplace", value=ast.Constant(value=True)))
-          stmt_list[0] = ast.Expr(value=call_raw)
+        
+        # Add the inplace=True argument. This implicitly 
+        # updates orig_wrapped_in_lambda, which updates new_replace_call.
+        call_raw.keywords.append(
+          ast.keyword(arg="inplace", value=ast.Constant(value=True)))
+        stmt_list[0] = new_replace_call
+      else:
+        patt.attr_call.call.set_enclosed_obj(new_replace_call)
 
       stats[type(patt).__name__] = 1
     elif isinstance(patt, patt_matcher.MultipleStrInCol):
