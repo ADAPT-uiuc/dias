@@ -386,6 +386,11 @@ def substr_search_apply(ser, needle: str, orig: Callable):
   else:
     return orig(ser)
 
+def len_unique(series):
+  if type(series) == pd.Series:
+    return series.nunique(dropna=False)
+  return len(series.unique())
+
 def rewrite_enclosed_sub(enclosed_sub, arg0_name, the_one_series):
   sub = enclosed_sub.get_obj()
   compat_sub = patt_matcher.is_compatible_sub(sub)
@@ -1441,6 +1446,15 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
         args=[original_left_called_on])
       )
 
+      stats[type(patt).__name__] = 1
+    elif isinstance(patt, patt_matcher.LenUnique):
+      patt.enclosed_call.set_enclosed_obj(
+        AST_attr_call(
+          called_on=AST_attr_chain('dias.rewriter'),
+          name="len_unique",
+          keywords={'series': patt.series}
+        )
+      )
       stats[type(patt).__name__] = 1
     else:
       # No matched pattern, don't change stmt

@@ -1447,6 +1447,39 @@ def is_fuse_apply(attr_call: AttrCall) -> Optional[FuseApply]:
   return FuseApply(right_apply=right_apply, left_apply=left_apply)
    
   
+class LenUnique:
+  def __init__(self, enclosed_call: OptEnclosed[ast.Call], series: ast.AST):
+    self.enclosed_call = enclosed_call
+    self.series = series
+
+def is_len_unique(enclosed_call: OptEnclosed[ast.Call]) -> Optional[LenUnique]:
+  # Matching len(x.unique()), for any x
+  len_call = enclosed_call.get_obj()
+  if not isinstance(len_call, ast.Call): # redundant
+    return None
+  if len(len_call.args) != 1 or len_call.keywords != []:
+    return None
+
+  len_function = len_call.func
+  if not isinstance(len_function, ast.Name):
+    return False
+  if len_function.id != 'len':
+    return False
+  
+  unique_call = len_call.args[0]
+  if not isinstance(unique_call, ast.Call):
+    return None
+  if unique_call.args != [] or unique_call.keywords != []:
+    return None
+  
+  unique_func = unique_call.func
+  if not isinstance(unique_func, ast.Attribute):
+    return None
+  if unique_func.attr != 'unique':
+    return None
+
+  return LenUnique(enclosed_call=enclosed_call, series=unique_func.value)
+
 
 # Dispatch all the ugliness of what pattern we have recognized here.
 # Because we can return immediately, we don't have to have a ridiculously
@@ -1473,7 +1506,8 @@ Union[
   FuseApply,
   StrSplitPython,
   StrAttrIndexed,
-  SubToSubReplace
+  SubToSubReplace,
+  LenUnique
 ]
 def recognize_pattern(stmt: ast.stmt) ->  Optional[Single_Stmt_Patts]:
   # Start with the trivial patterns.
@@ -1595,6 +1629,9 @@ def recognize_pattern(stmt: ast.stmt) ->  Optional[Single_Stmt_Patts]:
         if sort_head is not None:
           return sort_head
       ## END OF ATTR CALL IF ##
+      len_unique = is_len_unique(enclosed_call)
+      if len_unique is not None:
+        return len_unique
 
   if len(str_in_cols) != 0:
     return MultipleStrInCol(str_in_cols=str_in_cols)
