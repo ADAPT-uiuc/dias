@@ -9,8 +9,8 @@
       "rewritten-exec-time":2.36359
     },
     {
-      "raw":"\nour = pd.Series(df['Name'].tolist() + df['Name'].tolist())\n",
-      "modified":"our = pd.concat([df['Name'], df['Name']], ignore_index=True)\n",
+      "raw":"\nour = pd.Series(df['Name'].tolist() + df['Ticket'].tolist())\n",
+      "modified":"our = dias.rewriter.concat_list_to_series(library=pd, e1=df['Name'], e2=df[\n    'Ticket'])\n",
       "patts-hit":{
         "HasToListConcatToSeries":1
       },

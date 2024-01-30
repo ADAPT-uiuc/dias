@@ -26,19 +26,11 @@
     },
     {
       "raw":"\nour = df.loc[(df['Industry'].isin(env)) | (df['Industry'].isin(ai))].reset_index(drop=True,inplace=False)\n",
-      "modified":"our = df.loc[df['Industry'].isin(env + ai)].reset_index(drop=True, inplace=\n    False)\n",
+      "modified":"our = df.loc[dias.rewriter.fuse_isin(df=df, col_name='Industry', s1=env, s2=ai)\n    ].reset_index(drop=True, inplace=False)\n",
       "patts-hit":{
         "FuseIsIn":1
       },
       "rewritten-exec-time":0.617078
-    },
-    {
-      "raw":"\ndefa = df.loc[(df['Industry'].isin(env)) | (df['Industry'].isin(ai))].reset_index(drop=True,inplace=False)\n",
-      "modified":"defa = df.loc[df['Industry'].isin(env + ai)].reset_index(drop=True, inplace\n    =False)\n",
-      "patts-hit":{
-        "FuseIsIn":1
-      },
-      "rewritten-exec-time":0.515106
     },
     {
       "raw":"\nfor col in our.columns:\n    assert(our[col] == defa[col]).all()\n",

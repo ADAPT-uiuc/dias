@@ -50,7 +50,7 @@
     },
     {
       "raw":"\nresponses_df_2018['What is your gender? - Selected Choice'].replace(['Male'], 'Man',inplace=True)\nresponses_df_2018['What is your gender? - Selected Choice'].replace(['Female'], 'Woman',inplace=True)\n",
-      "modified":"responses_df_2018['What is your gender? - Selected Choice'].replace('Male',\n    'Man', inplace=True)\nresponses_df_2018['What is your gender? - Selected Choice'].replace('Female',\n    'Woman', inplace=True)\n",
+      "modified":"dias.rewriter.replace_remove_list(responses_df_2018[\n    'What is your gender? - Selected Choice'], ['Male'], 'Man', 'Male',\n    'Man', (lambda _DIAS_x1, _DIAS_x2: responses_df_2018[\n    'What is your gender? - Selected Choice'].replace(_DIAS_x1, _DIAS_x2,\n    inplace=True)))\ndias.rewriter.replace_remove_list(responses_df_2018[\n    'What is your gender? - Selected Choice'], ['Female'], 'Woman',\n    'Female', 'Woman', (lambda _DIAS_x1, _DIAS_x2: responses_df_2018[\n    'What is your gender? - Selected Choice'].replace(_DIAS_x1, _DIAS_x2,\n    inplace=True)))\n",
       "patts-hit":{
         "ReplaceRemoveList":1
       },
@@ -66,7 +66,7 @@
     },
     {
       "raw":"\nresp_copy = responses_df_2018.copy()\n\nresponses_df_2018.replace(['Kaggle Learn'], 'Kaggle Learn Courses',inplace=True)\nresponses_df_2018.replace(['Fast.AI'], 'Fast.ai',inplace=True)\nresponses_df_2018.replace(['Online University Courses'], 'University Courses (resulting in a university degree)',inplace=True)\n",
-      "modified":"resp_copy = responses_df_2018.copy()\nresponses_df_2018.replace('Kaggle Learn', 'Kaggle Learn Courses', inplace=True)\nresponses_df_2018.replace('Fast.AI', 'Fast.ai', inplace=True)\nresponses_df_2018.replace('Online University Courses',\n    'University Courses (resulting in a university degree)', inplace=True)\n",
+      "modified":"resp_copy = responses_df_2018.copy()\ndias.rewriter.replace_remove_list(responses_df_2018, ['Kaggle Learn'],\n    'Kaggle Learn Courses', 'Kaggle Learn', 'Kaggle Learn Courses', (lambda\n    _DIAS_x1, _DIAS_x2: responses_df_2018.replace(_DIAS_x1, _DIAS_x2,\n    inplace=True)))\ndias.rewriter.replace_remove_list(responses_df_2018, ['Fast.AI'], 'Fast.ai',\n    'Fast.AI', 'Fast.ai', (lambda _DIAS_x1, _DIAS_x2: responses_df_2018.\n    replace(_DIAS_x1, _DIAS_x2, inplace=True)))\ndias.rewriter.replace_remove_list(responses_df_2018, [\n    'Online University Courses'],\n    'University Courses (resulting in a university degree)',\n    'Online University Courses',\n    'University Courses (resulting in a university degree)', (lambda\n    _DIAS_x1, _DIAS_x2: responses_df_2018.replace(_DIAS_x1, _DIAS_x2,\n    inplace=True)))\n",
       "patts-hit":{
         "ReplaceRemoveList":1
       },
