@@ -1,0 +1,28 @@
+{
+  "cells":[  
+    {
+      "raw": "\ndf = pd.read_csv('titanic.csv')\n",
+      "modified": "df = pd.read_csv('titanic.csv')\n",
+      "patts-hit": {
+
+      },
+      "rewritten-exec-time": 7.481041
+    },
+    {
+      "raw": "\nour_num_tickets = len(df['Ticket'].unique())\nour_num_cabins = len(df['Cabin'].unique()) # contains NaN!\n",
+      "modified": "our_num_tickets = dias.rewriter.len_unique(series=df['Ticket'])\nour_num_cabins = dias.rewriter.len_unique(series=df['Cabin'])\n",
+      "patts-hit": {
+        "LenUnique":1
+      },
+      "rewritten-exec-time": 2.36925
+    },
+    {
+      "raw": "\nassert our_num_tickets == default_num_tickets\nassert our_num_cabins == default_num_cabins\n",
+      "modified": "assert our_num_tickets == default_num_tickets\nassert our_num_cabins == default_num_cabins\n",
+      "patts-hit": {
+
+      },
+      "rewritten-exec-time": 0.198417
+    }
+  ]
+}
