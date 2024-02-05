@@ -1465,9 +1465,9 @@ def is_len_unique(enclosed_call: OptEnclosed[ast.Call]) -> Optional[LenUnique]:
 
   len_function = len_call.func
   if not isinstance(len_function, ast.Name):
-    return False
+    return None
   if len_function.id != 'len':
-    return False
+    return None
   
   unique_call = len_call.args[0]
   if not isinstance(unique_call, ast.Call):
