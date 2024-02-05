@@ -1043,7 +1043,7 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
         # We can specialize this for an index that is an int. Try to convert the string to int
         # and if you fail, 
         contains_expr = f"astype(str).str.contains('{the_str}').any()"
-        new_expr = f"({the_sub}.{contains_expr} or _REWR_index_contains({the_sub}.index, '{the_str}')) if type({df}) == pd.DataFrame else ({orig})"
+        new_expr = f"({the_sub}.{contains_expr} or _REWR_index_contains({the_sub}.index, '{the_str}')) if (type({df}) == pd.DataFrame and {the_sub}.index.dtype == np.int64) else ({orig})"
         str_in_col.cmp_encl.set_enclosed_obj(ast.parse(new_expr, mode='eval'))
       ### END OF LOOP ###
 
