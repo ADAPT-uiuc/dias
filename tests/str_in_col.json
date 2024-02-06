@@ -15,6 +15,14 @@
         "MultipleStrInCol":1
       },
       "rewritten-exec-time":68.81415
+    },
+    {
+      "raw": "\n'41' in df['Profit'].to_string()\n",
+      "modified": "def _REWR_index_contains(index, s):\n    if index.dtype == np.int64:\n        try:\n            i = int(s)\n            return len(index.loc[i]) > 0\n        except:\n            return False\n    else:\n        return index.astype(str).str.contains(s).any()\n(df['Profit'].astype(str).str.contains('41').any() or _REWR_index_contains(\n    df['Profit'].index, '41') if type(df) == pd.DataFrame and df['Profit'].\n    index.dtype == np.int64 else '41' in df['Profit'].to_string())\n",
+      "patts-hit": {
+        "MultipleStrInCol": 1
+      },
+      "rewritten-exec-time": 129.444458
     }
   ]
 }

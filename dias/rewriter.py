@@ -1031,10 +1031,11 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
         col = None
         if isinstance(str_in_col.the_sub.slice, ast.Name):
           col = str_in_col.the_sub.slice.id
+          the_sub = f"{df}[{col}]"
         else:
           assert isinstance(str_in_col.the_sub.slice, ast.Constant)
           col = str_in_col.the_sub.slice.value
-        the_sub = f"{df}[{col}]"
+          the_sub = f"{df}['{col}']"
         orig = f"'{the_str}' in {the_sub}.to_string()"
 
         # You need to be careful when handling strings like that because you might
