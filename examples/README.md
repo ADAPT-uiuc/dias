@@ -1,1 +1,0 @@
-The fastest way to get started is possibly our [Quickstart Google Colab notebook](https://colab.research.google.com/drive/1Pe0N8pqfUReVWvYogXuvBD3YHQfhvlOR?usp=sharing), or you can explore the self-contained examples in this folder.
