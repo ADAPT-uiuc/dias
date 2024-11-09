@@ -261,7 +261,7 @@ class DropToPop:
     col_t = astor.dump_tree(self.col)
     return f"DropToPop(df={df_t}, col={col_t})"
 
-def drop_to_pop_helper(call_encl: OptEnclosed[ast.Call]):
+def drop_to_pop_helper(call_encl: OptEnclosed[ast.Call]) -> Optional[DropToPop]:
   call = call_encl.get_obj()
   attr_call = is_attr_call(call_encl)
   if not attr_call:
@@ -302,8 +302,7 @@ def drop_to_pop_helper(call_encl: OptEnclosed[ast.Call]):
 
 # @{expr: df}.drop(@{expr: col}, axis=1)
 #
-
-def is_drop_to_pop(n: ast.stmt) -> Optional[DropToPop]:
+def is_drop_to_pop(n: ast.AST) -> Optional[DropToPop]:
   calls = search_enclosed(n, ast.Call)
 
   for encl_call in calls:
@@ -313,6 +312,58 @@ def is_drop_to_pop(n: ast.stmt) -> Optional[DropToPop]:
   ### END FOR ###
   return None
 
+# @{expr: df}[@{expr: pred}][@{Const(str): col}]
+# -->
+# @{df}[@{pred}, @{col}]
+
+# TODO: Support lists of booleans.
+# Preconditions:
+# - `isinstance(@{df}, pd.DataFrame)`
+# - `isinstance(@{pred}, pd.Series) and @{pred}.dtype == bool`
+@dataclass
+class SubSeq:
+  df: ast.expr
+  pred: ast.expr
+  col: ast.Constant
+  sub_encl: OptEnclosed[ast.Subscript]
+  
+  def __repr__(self):
+    df_t = astor.dump_tree(self.df)
+    pred_t = astor.dump_tree(self.pred)
+    col_t = astor.dump_tree(self.col)
+    return f"SubSeq(df={df_t}, pred={pred_t}, col={col_t})"
+
+# df[df['a'] == 1]['col']"
+# -->
+# value=Subscript(
+#   value=Subscript(value=Name(id='df'),
+#       slice=Compare(
+#           left=Subscript(value=Name(id='df'), slice=Constant(value='a', kind=None)),
+#           ops=[Eq],
+#           comparators=[Constant(value=1, kind=None)])),
+#   slice=Constant(value='col', kind=None))
+def is_subseq_helper(sub_encl: OptEnclosed[ast.Subscript]) -> Optional[SubSeq]:
+  sub = sub_encl.get_obj()
+  if ((not isinstance(sub.slice, ast.Constant)) or 
+      not isinstance(sub.slice.value, str)):
+    return None
+  if not isinstance(sub.value, ast.Subscript):
+    return None
+  in_sub = sub.value
+  df = in_sub.value
+  pred = in_sub.slice
+  col = sub.slice
+  return SubSeq(df=df, pred=pred, col=col, sub_encl=sub_encl)
+  
+def is_subseq(n: ast.AST) -> Optional[SubSeq]:
+  subs = search_enclosed(n, ast.Subscript)
+
+  for encl_sub in subs:
+    ret = is_subseq_helper(encl_sub)
+    if ret:
+      return ret
+  ### END FOR ###
+  return None
 
 
 Available_Patterns = \
@@ -322,7 +373,8 @@ Union[
   TrivialName,
   TrivialCall,
 
-
+  DropToPop,
+  SubSeq
 ]
 
 # Unlike the original Dias patt matcher, this is not hierarchical to reduce
@@ -344,13 +396,17 @@ def recognize_pattern(stmt: ast.stmt) ->  Optional[Available_Patterns]:
     return IsTrivialDFCall()
 
   # Otherwise, proceed with the actual patterns
+  
+  funcs = [is_drop_to_pop, is_subseq]
 
   # TODO: We need to somehow stop this walk early. For example, if the node
   # is a Subscript, then it won't match any pattern.
   for n in ast.walk(stmt):
-    dtp = is_drop_to_pop(n)
-    if dtp:
-      return dtp
+    for func in funcs:
+      ret = func(n)
+      if ret:
+        return ret
+    ### END FOR ###
   ### END FOR ###
 
   return None
@@ -359,7 +415,8 @@ def patt_match(mod: ast.Module):
   res: List[Available_Patterns] = []
   for stmt in mod.body:
     patt = recognize_pattern(stmt)
-    res.append(patt)
+    if patt:
+      res.append(patt)
   ### END FOR ###
   return res
 

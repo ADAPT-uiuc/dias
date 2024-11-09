@@ -1,3 +1,3 @@
-./install.sh
+../install.sh
 
 pytest

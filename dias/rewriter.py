@@ -199,7 +199,21 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
         keywords={'df': patt.df, 'col': patt.col}
       )
       patt.call_encl.set_enclosed_obj(call)
-      
+    elif isinstance(patt, patt_matcher.SubSeq):
+      call = AST_attr_call(
+        called_on=AST_attr_chain('dias.dyn'),
+        name="subseq",
+        keywords={'df': patt.df, 'pred': patt.pred, 'col': patt.col}
+      )
+      patt.sub_encl.set_enclosed_obj(call)
+    elif isinstance(patt, (patt_matcher.IsTrivialDFCall,
+                           patt_matcher.IsTrivialDFAttr,
+                           patt_matcher.TrivialName,
+                           patt_matcher.TrivialCall)):
+      pass
+    else:
+      print(patt)
+      assert False
   ### END FOR ###
 
   new_source = astor.to_source(cell_ast)

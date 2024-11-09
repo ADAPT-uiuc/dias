@@ -17,3 +17,18 @@ def drop_to_pop(df, col):
   
   df.pop(col_str)
   return None
+
+def subseq_orig(df, pred, col):
+  return df[pred][col]
+
+def subseq(df, pred, col):
+  if not isinstance(df, pd.DataFrame):
+    return subseq_orig(df, pred, col)
+  
+  if not isinstance(pred, pd.Series):
+    return subseq_orig(df, pred, col)
+
+  if not pred.dtype == 'bool':
+    return subseq_orig(df, pred, col)
+  
+  return df.loc[pred, col]
