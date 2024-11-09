@@ -17,17 +17,20 @@ import dias.dyn
 df = pd.read_csv('{DATASETS_PATH}/titanic.csv')
 """
 
-def boiler(cell):
+def boiler(cell, setup_state=None):
   rewr_dias = dias.rewriter.rewrite_ast_from_source(cell)[0]
   print('rewr_dias:', rewr_dias)
+  
+  if setup_state is None:
+    setup_state = SETUP_STATE
 
   # We use different modules and so different states
   mod_orig = types.ModuleType('Orig')
-  exec_code(SETUP_STATE, mod_orig)
+  exec_code(setup_state, mod_orig)
   exec_code(cell, mod_orig)
   
   mod_rewr = types.ModuleType('Rewr')
-  exec_code(SETUP_STATE, mod_rewr)
+  exec_code(setup_state, mod_rewr)
   exec_code(rewr_dias, mod_rewr)
 
   return mod_orig, mod_rewr

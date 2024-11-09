@@ -32,3 +32,18 @@ def subseq(df, pred, col):
     return subseq_orig(df, pred, col)
   
   return df.loc[pred, col]
+
+
+def replace_to_map_orig(ser, map_):
+  return ser.replace(map_)
+
+def replace_to_map(ser, map_):
+  if not isinstance(ser, pd.Series):
+    return replace_to_map_orig(ser, map_)
+  
+  if not isinstance(map_, map):
+    return replace_to_map_orig(ser, map_)
+
+  default = {x: x for x in ser.drop_duplicates().values}
+  default.update(map_)
+  return ser.map(default)

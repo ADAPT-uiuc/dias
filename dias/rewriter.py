@@ -206,6 +206,13 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
         keywords={'df': patt.df, 'pred': patt.pred, 'col': patt.col}
       )
       patt.sub_encl.set_enclosed_obj(call)
+    elif isinstance(patt, patt_matcher.ReplaceToMap):
+      call = AST_attr_call(
+        called_on=AST_attr_chain('dias.dyn'),
+        name="replace_to_map",
+        keywords={'ser': patt.ser, 'map_': patt.map_}
+      )
+      patt.call_encl.set_enclosed_obj(call)
     elif isinstance(patt, (patt_matcher.IsTrivialDFCall,
                            patt_matcher.IsTrivialDFAttr,
                            patt_matcher.TrivialName,

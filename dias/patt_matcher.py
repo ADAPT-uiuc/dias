@@ -319,8 +319,49 @@ def is_subseq(n: ast.AST) -> Optional[SubSeq]:
   return None
 
 
+@dataclass
+class ReplaceToMap:
+  ser: ast.expr
+  map_: ast.expr
+  call_encl: OptEnclosed[ast.Call]
+
+  def __repr__(self):
+    ser_t = astor.dump_tree(self.ser)
+    map_t = astor.dump_tree(self.map_)
+    return f'ReplaceToMap(ser={ser_t}, map_={map_t})'
+
+
+def is_repl_to_map_helper(call_encl: OptEnclosed[ast.Call]) -> Optional[
+    ReplaceToMap]:
+  call = call_encl.get_obj()
+  attr_call = is_attr_call(call_encl)
+  _metap_ret = attr_call
+  if _metap_ret is None:
+    return None
+  if attr_call.get_func() != 'replace':
+    return None
+  args = call.args
+  kws = call.keywords
+  if len(kws) != 0:
+    return None
+  if len(args) != 1:
+    return None
+  ser = attr_call.get_called_on()
+  map_ = args[0]
+  return ReplaceToMap(ser=ser, map_=map_, call_encl=call_encl)
+
+
+def is_replace_to_map(n: ast.AST) -> Optional[ReplaceToMap]:
+  calls = search_enclosed(n, ast.Call)
+  for call_encl in calls:
+    _metap_ret = is_repl_to_map_helper(call_encl)
+    if _metap_ret is not None:
+      return _metap_ret
+  return None
+
+
 Available_Patterns = Union[IsTrivialDFCall, IsTrivialDFAttr, TrivialName,
-    TrivialCall, DropToPop, SubSeq]
+    TrivialCall, DropToPop, SubSeq, ReplaceToMap]
 
 
 def recognize_pattern(stmt: ast.stmt) -> Optional[Available_Patterns]:
@@ -332,7 +373,7 @@ def recognize_pattern(stmt: ast.stmt) -> Optional[Available_Patterns]:
     return IsTrivialDFAttr()
   if is_trivial_df_call(stmt):
     return IsTrivialDFCall()
-  funcs = [is_drop_to_pop, is_subseq]
+  funcs = [is_drop_to_pop, is_subseq, is_replace_to_map]
   for n in ast.walk(stmt):
     for func in funcs:
       _metap_ret = func(n)

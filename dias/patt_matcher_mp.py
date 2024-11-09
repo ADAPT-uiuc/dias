@@ -333,8 +333,8 @@ class SubSeq:
     col_t = astor.dump_tree(self.col)
     return f"SubSeq(df={df_t}, pred={pred_t}, col={col_t})"
 
-# df[df['a'] == 1]['col']"
-# -->
+# df[df['a'] == 1]['col']
+# ===
 # value=Subscript(
 #   value=Subscript(value=Name(id='df'),
 #       slice=Compare(
@@ -364,6 +364,68 @@ def is_subseq(n: ast.AST) -> Optional[SubSeq]:
   return None
 
 
+# @{expr: ser}.replace(@{expr: map_})
+# -->
+# ser = @{ser}
+# default = {x: x for x in ser.drop_duplicates().values}
+# default.update(@{map_})
+# ser.map(default)
+
+# Preconditions:
+# - isinstance(@{ser}, pd.Series)
+# - isinstance(@{map_}, map)
+@dataclass
+class ReplaceToMap:
+  ser: ast.expr
+  map_: ast.expr
+  call_encl: OptEnclosed[ast.Call]
+  
+  def __repr__(self):
+    ser_t = astor.dump_tree(self.ser)
+    map_t = astor.dump_tree(self.map_)
+    return f"ReplaceToMap(ser={ser_t}, map_={map_t})"
+
+
+# df['Sex'].replace({'male': 0, 'female': 1})
+# ===
+# Call(
+#   func=Attribute(
+#       value=Subscript(value=Name(id='df'), slice=Constant(value='Sex', kind=None)),
+#       attr='replace'),
+#   args=[
+#       Dict(
+#           keys=[Constant(value='male', kind=None), Constant(value='female', kind=None)],
+#           values=[Constant(value=0, kind=None), Constant(value=1, kind=None)])],
+#   keywords=[])
+def is_repl_to_map_helper(call_encl: OptEnclosed[ast.Call]) -> Optional[ReplaceToMap]:
+  call = call_encl.get_obj()
+  attr_call = is_attr_call(call_encl)
+  __ret_ifn(attr_call)
+  if attr_call.get_func() != 'replace':
+    return None
+
+  args = call.args
+  kws = call.keywords
+  if len(kws) != 0:
+    return None
+  if len(args) != 1:
+    return None
+
+  ser = attr_call.get_called_on()
+  map_ = args[0]
+
+  return ReplaceToMap(ser=ser, map_=map_, call_encl=call_encl)
+  
+def is_replace_to_map(n: ast.AST) -> Optional[ReplaceToMap]:
+  calls = search_enclosed(n, ast.Call)
+
+  for call_encl in calls:
+    __ret_ifnn(is_repl_to_map_helper(call_encl))
+  ### END FOR ###
+  return None
+
+
+
 Available_Patterns = \
 Union[
   IsTrivialDFCall,
@@ -372,7 +434,8 @@ Union[
   TrivialCall,
 
   DropToPop,
-  SubSeq
+  SubSeq,
+  ReplaceToMap
 ]
 
 # Unlike the original Dias patt matcher, this is not hierarchical to reduce
@@ -395,7 +458,7 @@ def recognize_pattern(stmt: ast.stmt) ->  Optional[Available_Patterns]:
 
   # Otherwise, proceed with the actual patterns
   
-  funcs = [is_drop_to_pop, is_subseq]
+  funcs = [is_drop_to_pop, is_subseq, is_replace_to_map]
 
   # TODO: We need to somehow stop this walk early. For example, if the node
   # is a Subscript, then it won't match any pattern.
