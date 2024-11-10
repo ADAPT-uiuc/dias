@@ -426,6 +426,48 @@ def is_replace_to_map(n: ast.AST) -> Optional[ReplaceToMap]:
 
 
 
+# @{expr: ser}.unique()
+# -->
+# @{ser}.drop_duplicates().values
+
+# Preconditions:
+# - `isinstance(@{ser}, pd.Series)`
+# - `@{ser}.dtype == 'O'`
+@dataclass
+class UniqueToDropDup:
+  ser: ast.expr
+  call_encl: OptEnclosed[ast.Call]
+  
+  def __repr__(self):
+    ser_t = astor.dump_tree(self.ser)
+    return f"UniqueToDropDup(ser={ser_t})"
+
+def uniq_to_drop_dup_helper(call_encl: OptEnclosed[ast.Call]) -> Optional[UniqueToDropDup]:
+  call = call_encl.get_obj()
+  attr_call = is_attr_call(call_encl)
+  __ret_ifn(attr_call)
+  if attr_call.get_func() != 'unique':
+    return None
+
+  args = call.args
+  kws = call.keywords
+  if len(kws) != 0:
+    return None
+  if len(args) != 0:
+    return None
+  
+  ser = attr_call.get_called_on()
+  return UniqueToDropDup(ser=ser, call_encl=call_encl)
+
+def is_uniq_to_drop_dup(n: ast.AST) -> Optional[UniqueToDropDup]:
+  calls = search_enclosed(n, ast.Call)
+
+  for call_encl in calls:
+    __ret_ifnn(uniq_to_drop_dup_helper(call_encl))
+  ### END FOR ###
+  return None
+
+
 Available_Patterns = \
 Union[
   IsTrivialDFCall,
@@ -435,7 +477,8 @@ Union[
 
   DropToPop,
   SubSeq,
-  ReplaceToMap
+  ReplaceToMap,
+  UniqueToDropDup
 ]
 
 # Unlike the original Dias patt matcher, this is not hierarchical to reduce
@@ -458,7 +501,7 @@ def recognize_pattern(stmt: ast.stmt) ->  Optional[Available_Patterns]:
 
   # Otherwise, proceed with the actual patterns
   
-  funcs = [is_drop_to_pop, is_subseq, is_replace_to_map]
+  funcs = [is_drop_to_pop, is_subseq, is_replace_to_map, is_uniq_to_drop_dup]
 
   # TODO: We need to somehow stop this walk early. For example, if the node
   # is a Subscript, then it won't match any pattern.

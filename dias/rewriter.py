@@ -213,6 +213,13 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
         keywords={'ser': patt.ser, 'map_': patt.map_}
       )
       patt.call_encl.set_enclosed_obj(call)
+    elif isinstance(patt, patt_matcher.UniqueToDropDup):
+      call = AST_attr_call(
+        called_on=AST_attr_chain('dias.dyn'),
+        name="unique_to_drop_dup",
+        keywords={'ser': patt.ser}
+      )
+      patt.call_encl.set_enclosed_obj(call)
     elif isinstance(patt, (patt_matcher.IsTrivialDFCall,
                            patt_matcher.IsTrivialDFAttr,
                            patt_matcher.TrivialName,

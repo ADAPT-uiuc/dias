@@ -47,3 +47,14 @@ def replace_to_map(ser, map_):
   default = {x: x for x in ser.drop_duplicates().values}
   default.update(map_)
   return ser.map(default)
+
+def unique_to_drop_dup(ser):
+  orig = lambda: ser.unique()
+
+  if not isinstance(ser, pd.Series):
+    return orig()
+  
+  if ser.dtype != 'O':
+    return orig()
+  
+  return ser.drop_duplicates().values

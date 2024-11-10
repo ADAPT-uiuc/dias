@@ -360,8 +360,46 @@ def is_replace_to_map(n: ast.AST) -> Optional[ReplaceToMap]:
   return None
 
 
+@dataclass
+class UniqueToDropDup:
+  ser: ast.expr
+  call_encl: OptEnclosed[ast.Call]
+
+  def __repr__(self):
+    ser_t = astor.dump_tree(self.ser)
+    return f'UniqueToDropDup(ser={ser_t})'
+
+
+def uniq_to_drop_dup_helper(call_encl: OptEnclosed[ast.Call]) -> Optional[
+    UniqueToDropDup]:
+  call = call_encl.get_obj()
+  attr_call = is_attr_call(call_encl)
+  _metap_ret = attr_call
+  if _metap_ret is None:
+    return None
+  if attr_call.get_func() != 'unique':
+    return None
+  args = call.args
+  kws = call.keywords
+  if len(kws) != 0:
+    return None
+  if len(args) != 0:
+    return None
+  ser = attr_call.get_called_on()
+  return UniqueToDropDup(ser=ser, call_encl=call_encl)
+
+
+def is_uniq_to_drop_dup(n: ast.AST) -> Optional[UniqueToDropDup]:
+  calls = search_enclosed(n, ast.Call)
+  for call_encl in calls:
+    _metap_ret = uniq_to_drop_dup_helper(call_encl)
+    if _metap_ret is not None:
+      return _metap_ret
+  return None
+
+
 Available_Patterns = Union[IsTrivialDFCall, IsTrivialDFAttr, TrivialName,
-    TrivialCall, DropToPop, SubSeq, ReplaceToMap]
+    TrivialCall, DropToPop, SubSeq, ReplaceToMap, UniqueToDropDup]
 
 
 def recognize_pattern(stmt: ast.stmt) -> Optional[Available_Patterns]:
@@ -373,7 +411,7 @@ def recognize_pattern(stmt: ast.stmt) -> Optional[Available_Patterns]:
     return IsTrivialDFAttr()
   if is_trivial_df_call(stmt):
     return IsTrivialDFCall()
-  funcs = [is_drop_to_pop, is_subseq, is_replace_to_map]
+  funcs = [is_drop_to_pop, is_subseq, is_replace_to_map, is_uniq_to_drop_dup]
   for n in ast.walk(stmt):
     for func in funcs:
       _metap_ret = func(n)
