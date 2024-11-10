@@ -143,6 +143,12 @@ class AttrCall:
     attr_ast = self.get_attr_ast()
     return attr_ast.value
   
+  def get_call_encl(self) -> OptEnclosed[ast.Call]:
+    return self.call
+  
+  def get_call(self) -> ast.Call:
+    return self.call.get_obj()
+  
   def set_called_on(self, new_obj):
     attr_ast = self.get_attr_ast()
     attr_ast.value = new_obj
@@ -468,6 +474,155 @@ def is_uniq_to_drop_dup(n: ast.AST) -> Optional[UniqueToDropDup]:
   return None
 
 
+
+# @{expr: df}.sort_values([by=]@{expr: by}, [ascending={expr: asc}]).head([[n=]@{expr: n}])
+# -->
+# By default: @{asc} = True, @{n} = 5
+#
+# if @{asc} == True:
+#   @{df}.nsmallest(n=@{n}, columns=@{by})
+# elif @{asc} == False:
+#   @{df}.nlargest(n=@{n}, columns=@{by})
+
+# Preconditions:
+# - isinstance(@{df}, pd.DataFrame)
+@dataclass
+class SortHeadDF:
+  df: ast.expr
+  by: ast.expr
+  asc: ast.expr
+  n: ast.expr
+  call_encl: OptEnclosed[ast.Call]
+
+  def __repr__(self):
+    df_t = astor.dump_tree(self.df)
+    by_t = astor.dump_tree(self.by)
+    asc_t = astor.dump_tree(self.asc)
+    n_t = astor.dump_tree(self.n)
+    return f"SortHeadDF(df={df_t}, by={by_t}, asc={asc_t}, n={n_t})"
+
+# @{expr: ser}.sort_values([by=]@{expr: by}, [ascending={expr: asc}]).head([[n=]@{expr: n}])
+# -->
+# By default: @{asc} = True, @{n} = 5
+#
+# if @{asc} == True:
+#   @{ser}.nsmallest(n=@{n})
+# elif @{asc} == False:
+#   @{ser}.nlargest(n=@{n})
+
+# Preconditions:
+# - isinstance(@{ser}, pd.Series)
+@dataclass
+class SortHeadSer:
+  ser: ast.expr
+  asc: ast.expr
+  n: ast.expr
+  call_encl: OptEnclosed[ast.Call]
+
+  def __repr__(self):
+    ser_t = astor.dump_tree(self.ser)
+    asc_t = astor.dump_tree(self.asc)
+    n_t = astor.dump_tree(self.n)
+    return f"SortHeadSer(df={ser_t}, asc={asc_t}, n={n_t})"
+
+def is_sort_head_df(sort_values: AttrCall) -> Optional[Dict]:
+  # Valid cases:
+  # 1) One kw, `by`
+  # 1) One pos arg (`by`)
+  # 1) One pos arg (`by`) and one kw (`ascending`)
+  # 2) Two kws (`by` and `ascending`) (theoretically in any order, in practice
+  #    it's almost always `by` followed by `ascending`)
+  sv_args = sort_values.get_call().args
+  sv_kws = sort_values.get_call().keywords
+  by = None
+  asc = None
+  if len(sv_args) == 1 and len(sv_kws) == 0:
+    by = sv_args[0]
+    asc = ast.Constant(value=True)
+  elif len(sv_kws) == 1 and sv_kws[0].arg == 'by' and len(sv_args) == 0:
+    by = sv_kws[0].value
+    asc = ast.Constant(value=True)
+  elif len(sv_kws) == 1 and sv_kws[0].arg == 'ascending' and len(sv_args) == 1:
+    by = sv_args[0]
+    asc = sv_kws[0].value
+  elif (len(sv_kws) == 2 and sv_kws[0].arg == 'by' and
+        sv_kws[1].arg == 'ascending' and len(sv_args) == 0):
+    by = sv_kws[0].value
+    asc = sv_kws[1].value
+  
+  __ret_ifn(by)
+  __ret_ifn(asc)
+  
+  df = sort_values.get_called_on()
+  return {'df': df, 'by': by, 'asc': asc}
+
+def is_sort_head_ser(sort_values: AttrCall) -> Optional[Dict]:
+  # Valid cases:
+  # 1) No pos or kw args at all
+  # 2) One kw, `ascending`
+  sv_args = sort_values.get_call().args
+  sv_kws = sort_values.get_call().keywords
+  asc = None
+  if len(sv_args) == 0 and len(sv_kws) == 0:
+    asc = ast.Constant(value=True)
+  elif len(sv_kws) == 1 and sv_kws[0].arg == 'ascending' and len(sv_args) == 0:
+    asc = sv_kws[0].value
+  
+  __ret_ifn(asc)
+  
+  ser = sort_values.get_called_on()
+  return {'ser': ser, 'asc': asc}
+
+def sort_head_helper(call_encl: OptEnclosed[ast.Call]) -> Optional[Union[SortHeadDF, SortHeadSer]]:
+  call = call_encl.get_obj()
+  head_ = is_attr_call(call_encl)
+  __ret_ifn(head_)
+  if head_.get_func() != 'head':
+    return None
+  
+  called_on = head_.get_called_on()
+  if not isinstance(called_on, ast.Call):
+    return None
+
+  sort_values = is_attr_call(get_non_enclosed(called_on))
+  __ret_ifn(sort_values)
+  if sort_values.get_func() != 'sort_values':
+    return None
+
+  head_args = head_.get_call().args
+  head_kws = head_.get_call().keywords
+  
+  # .head() either has exactly one kw ('n') and no args, or exactly one arg and
+  # no kws, or no args and no kws at all
+  n = None
+  if len(head_args) == 1 and len(head_kws) == 0:
+    n = head_args[0]
+  elif len(head_args) == 0 and len(head_kws) == 1 and head_kws[0].arg == 'n':
+    n = head_kws[0].value
+  elif len(head_args) == 0 and len(head_kws) == 0:
+    n = ast.Constant(value=5)
+  
+  __ret_ifn(n)
+  
+  df_d = is_sort_head_df(sort_values)
+  if df_d is not None:
+    return SortHeadDF(df=df_d['df'], by=df_d['by'],
+                      asc=df_d['asc'], n=n, call_encl=call_encl)
+  
+  ser_d = is_sort_head_ser(sort_values)
+  __ret_ifn(ser_d)
+  return SortHeadSer(ser=ser_d['ser'], asc=ser_d['asc'], 
+                     n=n, call_encl=call_encl)
+
+def is_sort_head(n: ast.AST) -> Optional[UniqueToDropDup]:
+  calls = search_enclosed(n, ast.Call)
+
+  for call_encl in calls:
+    __ret_ifnn(sort_head_helper(call_encl))
+  ### END FOR ###
+  return None
+
+
 Available_Patterns = \
 Union[
   IsTrivialDFCall,
@@ -478,7 +633,9 @@ Union[
   DropToPop,
   SubSeq,
   ReplaceToMap,
-  UniqueToDropDup
+  UniqueToDropDup,
+  SortHeadDF,
+  SortHeadSer
 ]
 
 # Unlike the original Dias patt matcher, this is not hierarchical to reduce
@@ -501,7 +658,8 @@ def recognize_pattern(stmt: ast.stmt) ->  Optional[Available_Patterns]:
 
   # Otherwise, proceed with the actual patterns
   
-  funcs = [is_drop_to_pop, is_subseq, is_replace_to_map, is_uniq_to_drop_dup]
+  funcs = [is_drop_to_pop, is_subseq, is_replace_to_map, is_uniq_to_drop_dup, 
+           is_sort_head]
 
   # TODO: We need to somehow stop this walk early. For example, if the node
   # is a Subscript, then it won't match any pattern.

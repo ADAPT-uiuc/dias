@@ -132,6 +132,12 @@ class AttrCall:
     attr_ast = self.get_attr_ast()
     return attr_ast.value
 
+  def get_call_encl(self) -> OptEnclosed[ast.Call]:
+    return self.call
+
+  def get_call(self) -> ast.Call:
+    return self.call.get_obj()
+
   def set_called_on(self, new_obj):
     attr_ast = self.get_attr_ast()
     attr_ast.value = new_obj
@@ -398,8 +404,133 @@ def is_uniq_to_drop_dup(n: ast.AST) -> Optional[UniqueToDropDup]:
   return None
 
 
+@dataclass
+class SortHeadDF:
+  df: ast.expr
+  by: ast.expr
+  asc: ast.expr
+  n: ast.expr
+  call_encl: OptEnclosed[ast.Call]
+
+  def __repr__(self):
+    df_t = astor.dump_tree(self.df)
+    by_t = astor.dump_tree(self.by)
+    asc_t = astor.dump_tree(self.asc)
+    n_t = astor.dump_tree(self.n)
+    return f'SortHeadDF(df={df_t}, by={by_t}, asc={asc_t}, n={n_t})'
+
+
+@dataclass
+class SortHeadSer:
+  ser: ast.expr
+  asc: ast.expr
+  n: ast.expr
+  call_encl: OptEnclosed[ast.Call]
+
+  def __repr__(self):
+    ser_t = astor.dump_tree(self.ser)
+    asc_t = astor.dump_tree(self.asc)
+    n_t = astor.dump_tree(self.n)
+    return f'SortHeadSer(df={ser_t}, asc={asc_t}, n={n_t})'
+
+
+def is_sort_head_df(sort_values: AttrCall) -> Optional[Dict]:
+  sv_args = sort_values.get_call().args
+  sv_kws = sort_values.get_call().keywords
+  by = None
+  asc = None
+  if len(sv_args) == 1 and len(sv_kws) == 0:
+    by = sv_args[0]
+    asc = ast.Constant(value=True)
+  elif len(sv_kws) == 1 and sv_kws[0].arg == 'by' and len(sv_args) == 0:
+    by = sv_kws[0].value
+    asc = ast.Constant(value=True)
+  elif len(sv_kws) == 1 and sv_kws[0].arg == 'ascending' and len(sv_args) == 1:
+    by = sv_args[0]
+    asc = sv_kws[0].value
+  elif len(sv_kws) == 2 and sv_kws[0].arg == 'by' and sv_kws[1
+      ].arg == 'ascending' and len(sv_args) == 0:
+    by = sv_kws[0].value
+    asc = sv_kws[1].value
+  _metap_ret = by
+  if _metap_ret is None:
+    return None
+  _metap_ret = asc
+  if _metap_ret is None:
+    return None
+  df = sort_values.get_called_on()
+  return {'df': df, 'by': by, 'asc': asc}
+
+
+def is_sort_head_ser(sort_values: AttrCall) -> Optional[Dict]:
+  sv_args = sort_values.get_call().args
+  sv_kws = sort_values.get_call().keywords
+  asc = None
+  if len(sv_args) == 0 and len(sv_kws) == 0:
+    asc = ast.Constant(value=True)
+  elif len(sv_kws) == 1 and sv_kws[0].arg == 'ascending' and len(sv_args) == 0:
+    asc = sv_kws[0].value
+  _metap_ret = asc
+  if _metap_ret is None:
+    return None
+  ser = sort_values.get_called_on()
+  return {'ser': ser, 'asc': asc}
+
+
+def sort_head_helper(call_encl: OptEnclosed[ast.Call]) -> Optional[Union[
+    SortHeadDF, SortHeadSer]]:
+  call = call_encl.get_obj()
+  head_ = is_attr_call(call_encl)
+  _metap_ret = head_
+  if _metap_ret is None:
+    return None
+  if head_.get_func() != 'head':
+    return None
+  called_on = head_.get_called_on()
+  if not isinstance(called_on, ast.Call):
+    return None
+  sort_values = is_attr_call(get_non_enclosed(called_on))
+  _metap_ret = sort_values
+  if _metap_ret is None:
+    return None
+  if sort_values.get_func() != 'sort_values':
+    return None
+  head_args = head_.get_call().args
+  head_kws = head_.get_call().keywords
+  n = None
+  if len(head_args) == 1 and len(head_kws) == 0:
+    n = head_args[0]
+  elif len(head_args) == 0 and len(head_kws) == 1 and head_kws[0].arg == 'n':
+    n = head_kws[0].value
+  elif len(head_args) == 0 and len(head_kws) == 0:
+    n = ast.Constant(value=5)
+  _metap_ret = n
+  if _metap_ret is None:
+    return None
+  df_d = is_sort_head_df(sort_values)
+  if df_d is not None:
+    return SortHeadDF(df=df_d['df'], by=df_d['by'], asc=df_d['asc'], n=n,
+        call_encl=call_encl)
+  ser_d = is_sort_head_ser(sort_values)
+  _metap_ret = ser_d
+  if _metap_ret is None:
+    return None
+  return SortHeadSer(ser=ser_d['ser'], asc=ser_d['asc'], n=n, call_encl=
+      call_encl)
+
+
+def is_sort_head(n: ast.AST) -> Optional[UniqueToDropDup]:
+  calls = search_enclosed(n, ast.Call)
+  for call_encl in calls:
+    _metap_ret = sort_head_helper(call_encl)
+    if _metap_ret is not None:
+      return _metap_ret
+  return None
+
+
 Available_Patterns = Union[IsTrivialDFCall, IsTrivialDFAttr, TrivialName,
-    TrivialCall, DropToPop, SubSeq, ReplaceToMap, UniqueToDropDup]
+    TrivialCall, DropToPop, SubSeq, ReplaceToMap, UniqueToDropDup,
+    SortHeadDF, SortHeadSer]
 
 
 def recognize_pattern(stmt: ast.stmt) -> Optional[Available_Patterns]:
@@ -411,7 +542,8 @@ def recognize_pattern(stmt: ast.stmt) -> Optional[Available_Patterns]:
     return IsTrivialDFAttr()
   if is_trivial_df_call(stmt):
     return IsTrivialDFCall()
-  funcs = [is_drop_to_pop, is_subseq, is_replace_to_map, is_uniq_to_drop_dup]
+  funcs = [is_drop_to_pop, is_subseq, is_replace_to_map,
+      is_uniq_to_drop_dup, is_sort_head]
   for n in ast.walk(stmt):
     for func in funcs:
       _metap_ret = func(n)

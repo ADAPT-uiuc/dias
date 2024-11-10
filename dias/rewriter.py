@@ -220,6 +220,20 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
         keywords={'ser': patt.ser}
       )
       patt.call_encl.set_enclosed_obj(call)
+    elif isinstance(patt, patt_matcher.SortHeadDF):
+      call = AST_attr_call(
+        called_on=AST_attr_chain('dias.dyn'),
+        name="sort_head_df",
+        keywords={'df': patt.df, 'by': patt.by, 'asc': patt.asc, 'n': patt.n}
+      )
+      patt.call_encl.set_enclosed_obj(call)
+    elif isinstance(patt, patt_matcher.SortHeadSer):
+      call = AST_attr_call(
+        called_on=AST_attr_chain('dias.dyn'),
+        name="sort_head_ser",
+        keywords={'ser': patt.ser, 'asc': patt.asc, 'n': patt.n}
+      )
+      patt.call_encl.set_enclosed_obj(call)
     elif isinstance(patt, (patt_matcher.IsTrivialDFCall,
                            patt_matcher.IsTrivialDFAttr,
                            patt_matcher.TrivialName,

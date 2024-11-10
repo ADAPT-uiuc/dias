@@ -58,3 +58,22 @@ def unique_to_drop_dup(ser):
     return orig()
   
   return ser.drop_duplicates().values
+
+def sort_head_df(df, by, asc, n):
+  if not isinstance(df, pd.DataFrame):
+    return df.sort_values(by=by, asc=asc).head(n=n)
+
+  if asc == True:
+    return df.nsmallest(n=n, columns=by)
+  else:
+    return df.nlargest(n=n, columns=by)
+
+
+def sort_head_ser(ser,  asc, n):
+  if not isinstance(ser, pd.Series):
+    return ser.sort_values(asc=asc).head(n=n)
+
+  if asc == True:
+    return ser.nsmallest(n=n)
+  else:
+    return ser.nlargest(n=n)
