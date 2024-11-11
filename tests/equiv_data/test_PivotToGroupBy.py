@@ -46,3 +46,16 @@ df = pd.read_csv('{common.DATASETS_PATH}/students.csv')
 
   del mod_orig
   del mod_rewr
+
+
+def test_simple4():
+  cell = "x = pd.pivot_table(df, index = 'Survived', values = 'Pclass', aggfunc = np.std)"
+  mod_orig, mod_rewr = common.boiler(cell)
+
+  actual = mod_orig.__dict__['x']
+  expected = mod_rewr.__dict__['x']
+
+  assert actual.equals(expected)
+
+  del mod_orig
+  del mod_rewr

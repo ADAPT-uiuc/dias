@@ -102,12 +102,15 @@ def pivot_to_gby(df, index, values, aggs):
   if not isinstance(df, pd.DataFrame):
     return orig()
 
-  if not isinstance(aggs, list):
-    return orig()
+  if isinstance(aggs, list):
+    if not all([agg in AGG_FUNCS for agg in aggs]):
+      return orig()
 
-  if not all([agg in AGG_FUNCS for agg in aggs]):
+    rewr = df.groupby(index)[values].agg(aggs)
+    rewr.columns = pd.MultiIndex.from_tuples([(func_to_name(agg), values) for agg in aggs])
+    return rewr
+  elif callable(aggs):
+    rewr = df.groupby(index)[values].agg(aggs)
+    return pd.DataFrame(rewr)
+  else:
     return orig()
-
-  rewr = df.groupby(index)[values].agg(aggs)
-  rewr.columns = pd.MultiIndex.from_tuples([(func_to_name(agg), values) for agg in aggs])
-  return rewr
