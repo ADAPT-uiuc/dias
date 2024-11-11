@@ -234,6 +234,14 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
         keywords={'ser': patt.ser, 'asc': patt.asc, 'n': patt.n}
       )
       patt.call_encl.set_enclosed_obj(call)
+    elif isinstance(patt, patt_matcher.PivotToGroupBy):
+      call = AST_attr_call(
+        called_on=AST_attr_chain('dias.dyn'),
+        name="pivot_to_gby",
+        keywords={'df': patt.df, 'index': patt.index,
+                  'values': patt.values, 'aggs': patt.aggs}
+      )
+      patt.call_encl.set_enclosed_obj(call)
     elif isinstance(patt, (patt_matcher.IsTrivialDFCall,
                            patt_matcher.IsTrivialDFAttr,
                            patt_matcher.TrivialName,

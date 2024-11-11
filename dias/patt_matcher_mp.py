@@ -622,6 +622,69 @@ def is_sort_head(n: ast.AST) -> Optional[UniqueToDropDup]:
   ### END FOR ###
   return None
 
+@dataclass
+class PivotToGroupBy:
+  df: ast.expr
+  index: ast.Constant
+  values: ast.Constant
+  aggs: ast.expr
+  call_encl: OptEnclosed[ast.Call]
+
+  def __repr__(self):
+    df_t = astor.dump_tree(self.df)
+    index_t = astor.dump_tree(self.index)
+    values_t = astor.dump_tree(self.values)
+    aggs_t = astor.dump_tree(self.aggs)
+    return f"PivotToGroupBy(df={df_t}, index={index_t}, values={values_t}, aggs={aggs_t})"
+
+def is_const_str(val) -> bool:
+  if isinstance(val, ast.Constant) and isinstance(val.value, str):
+    return True
+  return False
+
+def pivot_to_gby_helper(call_encl: Optional[ast.Call]) -> Optional[PivotToGroupBy]:
+  piv_call = is_attr_call(call_encl)
+  __ret_ifn(piv_call)
+  pd_ = piv_call.get_called_on()
+  if not isinstance(pd_, ast.Name) or pd_.id != "pd":
+    return None
+  if piv_call.get_func() != 'pivot_table':
+    return None
+  
+  args = piv_call.get_call().args
+  kws = piv_call.get_call().keywords
+  kws2 = kws.copy()
+  kw_d = {}
+  for i, kw in enumerate(kws):
+    cond1 = (kw.arg == 'index' or kw.arg == 'values') and is_const_str(kw.value)
+    cond2 = kw.arg == 'aggfunc'
+    if cond1 or cond2:
+      kw_d[kw.arg] = kw.value
+      kws2[i] = None
+  ### END FOR ###
+  kws2 = [kw for kw in kws2 if kw is not None]
+  df = None
+  case1 = len(kws2) == 0 and len(args) == 1
+  case2 = len(kws2) == 1 and kws[0].arg == 'data'
+  if case1:
+    df = args[0]
+  elif case2:
+    df = kws2[0].value
+  else:
+    return None
+  # END IF #
+  assert df is not None
+  return PivotToGroupBy(df=df, index=kw_d['index'], values=kw_d['values'], 
+                        aggs=kw_d['aggfunc'], call_encl=call_encl)
+
+
+def is_pivot_to_gby(n: ast.AST) -> Optional[PivotToGroupBy]:
+  calls = search_enclosed(n, ast.Call)
+
+  for call_encl in calls:
+    __ret_ifnn(pivot_to_gby_helper(call_encl))
+  ### END FOR ###
+  return None
 
 Available_Patterns = \
 Union[
@@ -635,7 +698,8 @@ Union[
   ReplaceToMap,
   UniqueToDropDup,
   SortHeadDF,
-  SortHeadSer
+  SortHeadSer,
+  PivotToGroupBy
 ]
 
 # Unlike the original Dias patt matcher, this is not hierarchical to reduce
@@ -659,7 +723,7 @@ def recognize_pattern(stmt: ast.stmt) ->  Optional[Available_Patterns]:
   # Otherwise, proceed with the actual patterns
   
   funcs = [is_drop_to_pop, is_subseq, is_replace_to_map, is_uniq_to_drop_dup, 
-           is_sort_head]
+           is_sort_head, is_pivot_to_gby]
 
   # TODO: We need to somehow stop this walk early. For example, if the node
   # is a Subscript, then it won't match any pattern.

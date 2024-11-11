@@ -12,6 +12,7 @@ def exec_code(code, mod):
 
 SETUP_STATE = f"""
 import pandas as pd
+import numpy as np
 import dias.dyn
 
 df = pd.read_csv('{DATASETS_PATH}/titanic.csv')

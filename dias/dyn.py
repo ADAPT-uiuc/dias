@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 def drop_to_pop_orig(df, col):
   return df.drop(col, axis=1, inplace=True)
@@ -69,7 +70,7 @@ def sort_head_df(df, by, asc, n):
     return df.nlargest(n=n, columns=by)
 
 
-def sort_head_ser(ser,  asc, n):
+def sort_head_ser(ser, asc, n):
   if not isinstance(ser, pd.Series):
     return ser.sort_values(asc=asc).head(n=n)
 
@@ -77,3 +78,36 @@ def sort_head_ser(ser,  asc, n):
     return ser.nsmallest(n=n)
   else:
     return ser.nlargest(n=n)
+
+def func_to_name(f):
+  if isinstance(f, str):
+    if f == 'max':
+      return 'amax'
+    return f
+  # END IF #
+  if f == 'max' or f == np.max:
+    return 'amax'
+  return f.__name__
+
+NP_AGGS = [np.sum, np.prod, np.mean, np.median, np.std, np.var, np.min, np.max,
+           np.argmin, np.argmax]
+STR_AGGS = ['sum', 'prod', 'mean', 'median', 'std', 'var', 'min', 'max', 'count', 'mad']
+NAME_AGGS = [max, min, len]
+
+AGG_FUNCS = NP_AGGS + STR_AGGS + NAME_AGGS
+
+def pivot_to_gby(df, index, values, aggs):
+  orig = lambda: pd.pivot_table(df, index=index, values=values, aggfunc=aggs)
+
+  if not isinstance(df, pd.DataFrame):
+    return orig()
+
+  if not isinstance(aggs, list):
+    return orig()
+
+  if not all([agg in AGG_FUNCS for agg in aggs]):
+    return orig()
+
+  rewr = df.groupby(index)[values].agg(aggs)
+  rewr.columns = pd.MultiIndex.from_tuples([(func_to_name(agg), values) for agg in aggs])
+  return rewr
