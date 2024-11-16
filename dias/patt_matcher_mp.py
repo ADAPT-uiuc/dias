@@ -350,6 +350,9 @@ class SubSeq:
 #   slice=Constant(value='col', kind=None))
 def is_subseq_helper(sub_encl: OptEnclosed[ast.Subscript]) -> Optional[SubSeq]:
   sub = sub_encl.get_obj()
+  if isinstance(sub.ctx, ast.Store):
+    return None
+
   if ((not isinstance(sub.slice, ast.Constant)) or 
       not isinstance(sub.slice.value, str)):
     return None

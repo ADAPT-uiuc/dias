@@ -55,14 +55,20 @@ def test_no_match():
   
   rewr_dias = dias.rewriter.rewrite_ast_from_source(cell)[0]
 
-  # To be consistent, do: actual == expected
   assert rewr_dias.strip() == cell.strip()
 
 
 def test_no_match2():
   cell = "df[df['a'] == 1][['col1', 'col2']]"
-  
+
   rewr_dias = dias.rewriter.rewrite_ast_from_source(cell)[0]
 
-  # To be consistent, do: actual == expected
+  assert rewr_dias.strip() == cell.strip()
+  
+
+def test_no_match_asgn():
+  cell = "df[df['a'] == 1]['col1'] = True"
+
+  rewr_dias = dias.rewriter.rewrite_ast_from_source(cell)[0]
+
   assert rewr_dias.strip() == cell.strip()
