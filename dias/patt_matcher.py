@@ -589,6 +589,8 @@ def pivot_to_gby_helper(call_encl: Optional[ast.Call]) -> Optional[
   assert df is not None
   if 'aggfunc' not in kw_d:
     kw_d['aggfunc'] = ast.Constant(value='mean')
+  if 'values' not in kw_d:
+    return None
   return PivotToGroupBy(df=df, index=kw_d['index'], values=kw_d['values'],
       aggs=kw_d['aggfunc'], call_encl=call_encl)
 

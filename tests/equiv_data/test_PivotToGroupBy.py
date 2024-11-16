@@ -59,3 +59,32 @@ def test_simple4():
 
   del mod_orig
   del mod_rewr
+  
+
+def test_mult_values():
+  cell = "x = pd.pivot_table(df, index = 'Survived', values = ['Pclass', 'Age'], aggfunc = ['min', 'sum'])"
+  mod_orig, mod_rewr = common.boiler(cell)
+
+  actual = mod_orig.__dict__['x']
+  expected = mod_rewr.__dict__['x']
+
+  assert actual.equals(expected)
+
+  del mod_orig
+  del mod_rewr
+
+
+def test_def_values():
+  cell = """
+df.drop(['Sex', 'Name'], axis=1, inplace=True)
+x = pd.pivot_table(df, index = 'Survived', aggfunc = ['min', 'sum'])
+"""
+  mod_orig, mod_rewr = common.boiler(cell)
+
+  actual = mod_orig.__dict__['x']
+  expected = mod_rewr.__dict__['x']
+
+  assert actual.equals(expected)
+
+  del mod_orig
+  del mod_rewr

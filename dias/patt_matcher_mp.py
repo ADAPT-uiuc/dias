@@ -680,6 +680,23 @@ def pivot_to_gby_helper(call_encl: Optional[ast.Call]) -> Optional[PivotToGroupB
   
   if 'aggfunc' not in kw_d:
     kw_d['aggfunc'] = ast.Constant(value='mean')
+  
+  if 'values' not in kw_d:
+    # TODO: We can do sth like this:
+    # vals = df.columns.tolist()
+    # vals.remove('Survived')
+
+    # for agg in ['min', 'sum']:
+    #   for val in vals:
+    #     tuples.append((agg, val))
+    #   ### END FOR ###
+    # ### END FOR ###
+    # tuples
+    # x2.columns = pd.MultiIndex.from_tuples(tuples)
+    # But columns may not have the same order as in the pivot table
+    # and I don't know how to know the order.
+    return None
+  # END IF #
   return PivotToGroupBy(df=df, index=kw_d['index'], values=kw_d['values'], 
                         aggs=kw_d['aggfunc'], call_encl=call_encl)
 
