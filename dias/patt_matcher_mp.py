@@ -358,6 +358,11 @@ def is_subseq_helper(sub_encl: OptEnclosed[ast.Subscript]) -> Optional[SubSeq]:
     return None
   if not isinstance(sub.value, ast.Subscript):
     return None
+  
+  sub_sub = sub.value
+  if isinstance(sub_sub.slice, ast.Slice):
+    return None
+  
   in_sub = sub.value
   df = in_sub.value
   pred = in_sub.slice

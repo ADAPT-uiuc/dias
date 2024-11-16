@@ -72,3 +72,10 @@ def test_no_match_asgn():
   rewr_dias = dias.rewriter.rewrite_ast_from_source(cell)[0]
 
   assert rewr_dias.strip() == cell.strip()
+
+def test_no_match_slice():
+  cell = "df.iloc[:size]['col1']"
+
+  rewr_dias = dias.rewriter.rewrite_ast_from_source(cell)[0]
+
+  assert rewr_dias.strip() == cell.strip()
