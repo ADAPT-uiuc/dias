@@ -14,3 +14,13 @@ dias.dyn.pivot_to_gby(df=df, index='Survived', values='Pclass', aggs=[np.
   rewr_dias = dias.rewriter.rewrite_ast_from_source(cell)[0]
   
   assert rewr_dias.strip() == rewr_corr.strip()
+
+def test_def_aggfunc():
+  cell = "pd.pivot_table(df, index = 'Survived', values = 'Pclass')"
+
+  rewr_corr = """
+dias.dyn.pivot_to_gby(df=df, index='Survived', values='Pclass', aggs='mean')
+"""
+  rewr_dias = dias.rewriter.rewrite_ast_from_source(cell)[0]
+  
+  assert rewr_dias.strip() == rewr_corr.strip()
