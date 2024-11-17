@@ -190,7 +190,7 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
   matched_patts = patt_matcher.patt_match(cell_ast)
 
   # Stats of what pattern was applied.
-  stats = dict()
+  patts_hit = dict()
   for patt in matched_patts:
     if isinstance(patt, patt_matcher.DropToPop):
       call = AST_attr_call(
@@ -250,11 +250,18 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
     else:
       print(patt)
       assert False
+    # END IF #
+    
+    if not isinstance(patt, (patt_matcher.IsTrivialDFCall,
+                      patt_matcher.IsTrivialDFAttr,
+                      patt_matcher.TrivialName,
+                      patt_matcher.TrivialCall)):
+      patts_hit[type(patt).__name__] = 1
   ### END FOR ###
 
   new_source = astor.to_source(cell_ast)
 
-  return new_source, stats
+  return new_source, patts_hit
 
 
 # In call_rewrite(), we modify the code such that it calls rewrite(). Inside
