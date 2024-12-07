@@ -1654,5 +1654,3 @@ if not use_as_lib:
     warnings.warn(text)
   else:
     ip.input_transformers_cleanup.append(call_rewrite)
-else:
-  ip.input_transformers_cleanup.append(call_rewrite)
