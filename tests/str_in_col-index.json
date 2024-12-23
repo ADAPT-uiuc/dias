@@ -1,0 +1,24 @@
+{
+  "cells": [
+    {
+      "raw": "\ndf = pd.read_csv('./datasets/dataranch__supermarket-sales-prediction-xgboost-fastai__SampleSuperstore.csv')\ndf_multi_index = df.set_index(['Postal Code', 'Sub-Category'])\n",
+      "modified": "df = pd.read_csv(\n    './datasets/dataranch__supermarket-sales-prediction-xgboost-fastai__SampleSuperstore.csv'\n    )\ndf_multi_index = df.set_index(['Postal Code', 'Sub-Category'])\n",
+      "patts-hit": {},
+      "rewritten-exec-time": 22.590208
+    },
+    {
+      "raw": "\nour = []\nfor col in df_multi_index.columns:\n    if 'ou' in df_multi_index[col].to_string():\n        our.append(col)\n",
+      "modified": "our = []\ndef _REWR_index_contains(index, s):\n    if index.dtype == np.int64:\n        try:\n            i = int(s)\n            return len(index.loc[i]) > 0\n        except:\n            return False\n    else:\n        return index.astype(str).str.contains(s).any()\nfor col in df_multi_index.columns:\n    if (df_multi_index[col].astype(str).str.contains('ou').any() or\n        _REWR_index_contains(df_multi_index[col].index, 'ou') if type(\n        df_multi_index) == pd.DataFrame and df_multi_index[col].index.dtype ==\n        np.int64 else 'ou' in df_multi_index[col].to_string()):\n        our.append(col)\n",
+      "patts-hit": {
+        "MultipleStrInCol": 1
+      },
+      "rewritten-exec-time": 932.628458
+    },
+    {
+      "raw": "\nassert our == defa\n",
+      "modified": "assert our == defa\n",
+      "patts-hit": {},
+      "rewritten-exec-time": 0.211667
+    }
+  ]
+}
