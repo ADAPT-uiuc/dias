@@ -372,11 +372,23 @@ def sort_head(called_on, by: str | None, n: int, asc: bool, orig: Callable):
     req_ty = pd.Series
     opt_func_obj = functools.partial(getattr(req_ty, func), n=n)
   
-  if type(called_on) == req_ty:
-    return opt_func_obj(self=called_on)
-  else:
+  if type(called_on) != req_ty:
     assert isinstance(orig, types.LambdaType)
     return orig(called_on)
+
+  # nsmallest() errors on columns of dtype object, while sort_values() doesn't
+  if by is None:
+    assert type(called_on) == pd.Series
+    ser = called_on
+  else:
+    assert type(called_on) == pd.DataFrame
+    ser = called_on[by]
+  if ser.dtype == object:
+    assert isinstance(orig, types.LambdaType)
+    return orig(called_on)
+
+  return opt_func_obj(self=called_on)
+  
 
 def substr_search_apply(ser, needle: str, orig: Callable):
   if type(ser) == pd.Series:
