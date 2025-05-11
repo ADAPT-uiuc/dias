@@ -1,12 +1,12 @@
 [project]
 name = "dias"
-version = "0.1.3"
+version = "0.1.4"
 authors = [
   { name="Stefanos Baziotis", email="sb54@illinois.edu" },
 ]
 description = "Dynamic rewriting of pandas code"
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.7,<3.12"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",

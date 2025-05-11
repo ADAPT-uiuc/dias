@@ -514,7 +514,7 @@ def gen_none_checked_idx(obj_to_idx: ast.AST, len_obj: ast.Call, idx: int) -> as
     AST_cmp(lhs=len_obj, rhs=ast.Constant(value=idx), op=ast.Gt())
   if_exp = \
     ast.IfExp(
-      body=AST_sub_const(obj_to_idx, idx),
+      body=AST_sub_const2(obj_to_idx, idx),
       orelse=ast.Constant(value=None),
       test=none_check)
   return if_exp
@@ -642,11 +642,49 @@ def vec__build_np_select(cond_value_pairs, else_val):
       keywords={'default': else_val[0]})
   return np_select
 
+def extract_line_info(n1, n2, nodes_to_extract_info_for):
+  if n1 in nodes_to_extract_info_for:
+    assert hasattr(n2, "lineno")
+    assert hasattr(n2, "end_lineno")
+    n1.lineno = n2.lineno
+    n1.end_lineno = n2.end_lineno
+  # END IF #
+
+def co_traverse_and_extract_line_info(node1, node2, nodes_to_extract_info_for):
+  if type(node1) != type(node2):
+    print(astor.dump_tree(node1, indentation='  '))
+    print('******')
+    print(astor.dump_tree(node2, indentation='  '))
+    assert False 
+  extract_line_info(node1, node2, nodes_to_extract_info_for)
+
+  for field in node1._fields:
+    if field in ["ctx", "type_ignores"]:
+      continue
+    val1 = getattr(node1, field)
+    val2 = getattr(node2, field)
+
+    if isinstance(val1, list):
+      for item1, item2 in zip(val1, val2):
+        co_traverse_and_extract_line_info(item1, item2, nodes_to_extract_info_for)
+      ### END FOR ###
+    elif isinstance(val1, ast.AST):
+      co_traverse_and_extract_line_info(val1, val2, nodes_to_extract_info_for)
+    else:
+      # Leaf values (numbers, strings, etc.)
+      pass
+    # END IF #
+  ### END FOR ###
+
 # I don't think we can declare a type for `ipython`
-def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
+def rewrite_ast(cell_ast: ast.Module, line_info=False) -> Tuple[str, Dict]:
   assert isinstance(cell_ast, ast.Module)
   body = cell_ast.body
   matched_patts = patt_matcher.patt_match(body)
+  
+  dias_rewriter_prefix = ast.Attribute(value=ast.Name(id='dias'), attr='rewriter')
+  pd_Series_prefix = ast.Attribute(value=ast.Name(id='pd'), attr='Series')
+  pd_DataFrame_prefix = ast.Attribute(value=ast.Name(id='pd'), attr='DataFrame')
 
   # TODO: We may be able to simplify the following not that sliced execution is gone.
 
@@ -719,7 +757,7 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
   list_of_lists = [[stmt] for stmt in body]
 
   # Stats of what pattern was applied.
-  stats = dict()
+  stats = []
   for patt, stmt_idxs in matched_patts:
     if patt is not None and type(patt).__name__ in disabled_patts:
       print(type(patt).__name__)
@@ -727,6 +765,10 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
 
     if isinstance(patt, patt_matcher.HasSubstrSearchApply):
       # Similar to SortHead
+      
+      orig_call = patt.attr_call.call.get_obj()
+      orig_lineno = orig_call.lineno
+      orig_end_lineno = orig_call.end_lineno
 
       lam_arg = "_DIAS_x"
       apply_call = patt.attr_call
@@ -748,17 +790,19 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
       
       new_call = \
         AST_attr_call(
-          called_on=AST_attr_chain('dias.rewriter'),
+          called_on=dias_rewriter_prefix,
           name="substr_search_apply",
           keywords={'ser': orig_called_on, 'needle': patt.get_needle(),
                     'orig': orig_wrapped_in_lambda}
         )
-
+      
       apply_call.call.set_enclosed_obj(new_call)
-
-      assert isinstance(patt, patt_matcher.HasSubstrSearchApply)
-
-      stats[type(patt).__name__] = 1
+      
+      patt_info = {"patt": type(patt).__name__,
+                   "orig-lineno": orig_lineno,
+                   "orig-end-lineno": orig_end_lineno,
+                   "delegates": [new_call]}
+      stats.append(patt_info)
     elif isinstance(patt, patt_matcher.IsInplaceUpdate):
       assert len(stmt_idxs) == 1
       stmt_idx = stmt_idxs[0]
@@ -766,6 +810,10 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
       orig_stmt = stmt_list[0]
 
       series_call: patt_matcher.SeriesCall = patt.series_call
+      orig_call = series_call.attr_call.call.get_obj()
+      orig_lineno = orig_call.lineno
+      orig_end_lineno = orig_call.end_lineno
+
       # Let's limit it to top-level. This makes our life easy
       # because we can bind the series access to a variable.
       # The reason we need to that even for CompatSub is that if
@@ -792,28 +840,39 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
       call_copy.keywords.append(ast.keyword(arg='inplace', value=ast.Constant(value=True, kind=None)))
       expr_call = ast.Expr(value=call_copy)
       
-      precond_check = wrap_in_if(tmp, "pd.Series", [orig_stmt], [expr_call])
+      precond_check = wrap_in_if(tmp, pd_Series_prefix, [orig_stmt], [expr_call])
 
       stmt_list[0] = asgn
       stmt_list.append(precond_check)
 
-      stats[type(patt).__name__] = 1
+      patt_info = {"patt": type(patt).__name__,
+                   "orig-lineno": orig_lineno,
+                   "orig-end-lineno": orig_end_lineno,
+                   "delegates": [asgn, precond_check]}
+      stats.append(patt_info)
     elif isinstance(patt, patt_matcher.HasToListConcatToSeries):
       # Pass for now
+      
+      orig_call = patt.enclosed_call.get_obj()
+      orig_lineno = orig_call.lineno
+      orig_end_lineno = orig_call.end_lineno
 
-      patt.enclosed_call.set_enclosed_obj(
-        AST_attr_call(
-          called_on=AST_attr_chain('dias.rewriter'),
+      new_call = AST_attr_call(
+          called_on=dias_rewriter_prefix,
           name="concat_list_to_series",
           keywords={
-            'library': patt.enclosed_call.get_obj().func.value, 
-            'e1': patt.left_ser_call.get_sub().get_sub_ast(), 
-            'e2': patt.right_ser_call.get_sub().get_sub_ast()
+              'library': patt.enclosed_call.get_obj().func.value,
+              'e1': patt.left_ser_call.get_sub().get_sub_ast(),
+              'e2': patt.right_ser_call.get_sub().get_sub_ast()
           }
-        )
       )
+      patt.enclosed_call.set_enclosed_obj(new_call)
 
-      stats[type(patt).__name__] = 1
+      patt_info = {"patt": type(patt).__name__,
+                   "orig-lineno": orig_lineno,
+                   "orig-end-lineno": orig_end_lineno,
+                   "delegates": [new_call]}
+      stats.append(patt_info)
     elif isinstance(patt, patt_matcher.SortHead):
       # Replace the call to sort_values() with nsmallest/nlargest.
 
@@ -905,6 +964,10 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
       #
       # will print 2, 3 (the global is not changed by foo() and the lambda captures the local environment of
       # the foo() when called from bar())
+      
+      orig_call = patt.head.call.get_obj()
+      orig_lineno = orig_call.lineno
+      orig_end_lineno = orig_call.end_lineno
 
       n = patt.get_head_n()
       by = patt.get_sort_by()
@@ -935,7 +998,7 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
 
       new_call = \
         AST_attr_call(
-          called_on=AST_attr_chain('dias.rewriter'),
+          called_on=dias_rewriter_prefix,
           name="sort_head",
           keywords={'called_on': orig_called_on, 'by': by, 
                     'n': n, 'asc': ast.Constant(value=patt.is_sort_ascending()), 
@@ -944,7 +1007,11 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
       
       patt.head.call.set_enclosed_obj(new_call)
 
-      stats[type(patt).__name__] = 1
+      patt_info = {"patt": type(patt).__name__,
+                   "orig-lineno": orig_lineno,
+                   "orig-end-lineno": orig_end_lineno,
+                   "delegates": [new_call]}
+      stats.append(patt_info)
     elif isinstance(patt, patt_matcher.ReplaceRemoveList):
       """This rewrites `e.replace([x1], [x2], **kwargs)` as:
       dias.rewriter.replace_remove_list(e, [x1], [x2], x1, x2, 
@@ -959,14 +1026,18 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
       call_raw = patt.attr_call.call.get_obj()      
       orig_to_replace = call_raw.args[0]
       orig_replace_with = call_raw.args[1]
+      orig_lineno = call_raw.lineno
+      orig_end_lineno = call_raw.end_lineno
+
 
       call_raw.args = [AST_name(name="_DIAS_x1"), AST_name(name="_DIAS_x2")]
-      
+
+      lambda_args_args = [
+          ast.arg(arg="_DIAS_x1"),
+          ast.arg(arg="_DIAS_x2")
+      ]      
       lambda_args = ast.arguments(
-        args=[
-          ast.arg(arg=AST_name(name="_DIAS_x1")),
-          ast.arg(arg=AST_name(name="_DIAS_x2"))
-        ],
+        args=lambda_args_args,
         defaults=[],
         kw_defaults=[],
         kwarg=None,
@@ -978,15 +1049,15 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
       orig_wrapped_in_lambda = ast.Lambda(args=lambda_args, body=call_raw)
 
       new_replace_call = AST_attr_call(
-        called_on=AST_attr_chain('dias.rewriter'),
+        called_on=dias_rewriter_prefix,
         name="replace_remove_list",
         args=[
-          ast.arg(arg=df_or_ser),
-          ast.arg(arg=orig_to_replace),
-          ast.arg(arg=orig_replace_with),
-          ast.arg(arg=patt.to_replace),
-          ast.arg(arg=patt.replace_with),
-          ast.arg(arg=orig_wrapped_in_lambda)
+          df_or_ser,
+          orig_to_replace,
+          orig_replace_with,
+          patt.to_replace,
+          patt.replace_with,
+          orig_wrapped_in_lambda
         ]
       )
 
@@ -1002,11 +1073,16 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
         # updates orig_wrapped_in_lambda, which updates new_replace_call.
         call_raw.keywords.append(
           ast.keyword(arg="inplace", value=ast.Constant(value=True)))
+        new_replace_call = ast.Expr(value=new_replace_call)
         stmt_list[0] = new_replace_call
       else:
         patt.attr_call.call.set_enclosed_obj(new_replace_call)
 
-      stats[type(patt).__name__] = 1
+      patt_info = {"patt": type(patt).__name__,
+                   "orig-lineno": orig_lineno,
+                   "orig-end-lineno": orig_end_lineno,
+                   "delegates": [new_replace_call]}
+      stats.append(patt_info)
     elif isinstance(patt, patt_matcher.MultipleStrInCol):
       assert len(stmt_idxs) == 1
       stmt_idx = stmt_idxs[0]
@@ -1022,6 +1098,10 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
         # of the file and it's available to the notebook because they're using
         # the same Python namespace. But I'm leaving it because it helps the user
         # see what's happening.
+        
+        orig_cmp = str_in_col.cmp_encl.get_obj()
+        orig_lineno = orig_cmp.lineno
+        orig_end_lineno = orig_cmp.end_lineno
 
 
         # Get string versions
@@ -1044,7 +1124,14 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
         # and if you fail, 
         contains_expr = f"astype(str).str.contains('{the_str}').any()"
         new_expr = f"({the_sub}.{contains_expr} or _REWR_index_contains({the_sub}.index, '{the_str}')) if type({df}) == pd.DataFrame else ({orig})"
-        str_in_col.cmp_encl.set_enclosed_obj(ast.parse(new_expr, mode='eval'))
+        new_cmp = ast.parse(new_expr, mode='eval').body
+        str_in_col.cmp_encl.set_enclosed_obj(new_cmp)
+        
+        patt_info = {"patt": type(patt).__name__,
+                    "orig-lineno": orig_lineno,
+                    "orig-end-lineno": orig_end_lineno,
+                    "delegates": [new_cmp]}
+        stats.append(patt_info)
       ### END OF LOOP ###
 
       index_contains_func_str = \
@@ -1060,25 +1147,30 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
 """
 
       save_stmt = stmt_list[0]
-      stmt_list[0] = ast.parse(index_contains_func_str)
+      stmt_list[0] = ast.parse(index_contains_func_str).body[0]
       stmt_list.append(save_stmt)
-
-      stats[type(patt).__name__] = 1
     elif isinstance(patt, patt_matcher.FuseIsIn):
-      patt.binop_encl.set_enclosed_obj(
-        AST_attr_call(
-          called_on=AST_attr_chain('dias.rewriter'),
+      orig_binop = patt.binop_encl.get_obj()
+      orig_lineno = orig_binop.lineno
+      orig_end_lineno = orig_binop.end_lineno
+      
+      new_call = AST_attr_call(
+          called_on=dias_rewriter_prefix,
           name="fuse_isin",
           keywords={
-            'df': AST_name(patt.the_ser.get_sub().get_df()),
-            'col_name': ast.Constant(value=patt.the_ser.get_sub().get_Series()),
-            's1': patt.left_name, 
-            's2': patt.right_name
+              'df': AST_name(patt.the_ser.get_sub().get_df()),
+              'col_name': ast.Constant(value=patt.the_ser.get_sub().get_Series()),
+              's1': patt.left_name,
+              's2': patt.right_name
           }
-        )
       )
+      patt.binop_encl.set_enclosed_obj(new_call)
       
-      stats[type(patt).__name__] = 1
+      patt_info = {"patt": type(patt).__name__,
+                   "orig-lineno": orig_lineno,
+                   "orig-end-lineno": orig_end_lineno,
+                   "delegates": [new_call]}
+      stats.append(patt_info)
     elif isinstance(patt, patt_matcher.StrSplitPython):
       assert len(stmt_idxs) == 1
       stmt_idx = stmt_idxs[0]
@@ -1090,6 +1182,9 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
 
       # Otherwise, we wouldn't have a gotten StrSplitPython directly.
       assert patt.expand_true == True
+      
+      orig_lineno = stmt.lineno
+      orig_end_lineno = stmt.end_lineno
 
       sub_to_split = patt.rhs_obj.get_sub_ast()
 
@@ -1111,7 +1206,7 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
       # of split().
       assert len(target_names) >= 1
 
-      targ0_append = gen_append(target_names[0], AST_sub_const(spl_name, 0))
+      targ0_append = gen_append(target_names[0], AST_sub_const2(spl_name, 0))
       for_body.append(targ0_append)
       # For the other targets, we need to check we have a split
       spl_len = AST_call(func=AST_name("len"), args=[spl_name])
@@ -1129,7 +1224,7 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
       for idx in range(len(patt.lhs_targets)):
         assign = \
           AST_assign(
-            lhs=AST_sub_const(patt.lhs_root_name, patt.lhs_targets[idx].value),
+            lhs=AST_sub_const2(patt.lhs_root_name, patt.lhs_targets[idx].value),
             rhs=target_names[idx]
           )
         assign_series.append(assign)
@@ -1139,14 +1234,21 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
       ### Wrap in if-else block ###
 
       new_stmt = \
-        wrap_in_if(sub_to_split, "pd.Series", then=[stmt_list[0]], else_=rewritten_body)
+        wrap_in_if(sub_to_split, pd_Series_prefix, then=[stmt_list[0]], else_=rewritten_body)
       stmt_list[0] = new_stmt
 
-      stats[type(patt).__name__] = 1
+      patt_info = {"patt": type(patt).__name__,
+                   "orig-lineno": orig_lineno,
+                   "orig-end-lineno": orig_end_lineno,
+                   "delegates": [new_stmt]}
+      stats.append(patt_info)
     elif isinstance(patt, patt_matcher.FusableStrSplit):
       assert len(stmt_idxs) == 2
       split_stmt_idx = stmt_idxs[0]
       split_stmt_list = list_of_lists[split_stmt_idx]
+      
+      orig_lineno = split_stmt_list[0].lineno
+      orig_end_lineno = patt.expr_to_replace.get_obj().end_lineno
 
       sub_to_split = patt.source_split.rhs_obj.get_sub_ast()
       idx_from_split_list = patt.index
@@ -1166,7 +1268,7 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
       
       value_to_append = None
       if idx_from_split_list == 0:
-        value_to_append = AST_sub_const(spl_name, idx_from_split_list)
+        value_to_append = AST_sub_const2(spl_name, idx_from_split_list)
       else:
         spl_len = AST_call(func=AST_name("len"), args=[spl_name])
         value_to_append = gen_none_checked_idx(spl_name, spl_len, idx_from_split_list)
@@ -1189,7 +1291,7 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
 
       new_stmt = \
         wrap_in_if(sub_to_split,
-                   "pd.Series",
+                   pd_Series_prefix,
                    then=[assign_orig_res],
                    else_=rewritten_body)
       # Replace the split with the new_stmt
@@ -1197,13 +1299,20 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
       # Replace the index expression with the final result
       patt.expr_to_replace.set_enclosed_obj(res_name)
 
-      stats[type(patt).__name__] = 1
+      patt_info = {"patt": type(patt).__name__,
+                   "orig-lineno": orig_lineno,
+                   "orig-end-lineno": orig_end_lineno,
+                   "delegates": [new_stmt]}
+      stats.append(patt_info)
     elif isinstance(patt, patt_matcher.FusableReplaceUnique):
       assert len(stmt_idxs) == 2
       replace_stmt_idx = stmt_idxs[0]
       replace_stmt_list = list_of_lists[replace_stmt_idx]
       unique_stmt_idx = stmt_idxs[1]
       unique_stmt_list = list_of_lists[unique_stmt_idx]
+      
+      orig_lineno = replace_stmt_list[0].lineno
+      orig_end_lineno = unique_stmt_list[0].end_lineno
 
       res_list_name = AST_name("_REWR_res")
       res_list_assgn = AST_assign(res_list_name, ast.List(elts=[]))
@@ -1267,7 +1376,7 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
           func=AST_name("type"),
           args=[patt.replace_on_sub.get_sub_ast()]
         ),
-        rhs=AST_attr_chain("pd.Series"),
+        rhs=pd_Series_prefix,
         op=ast.Eq()
       )
 
@@ -1293,11 +1402,19 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
       replace_stmt_list[0] = new_stmt
       unique_stmt_list[0] = outside_exp
       
-      stats[type(patt).__name__] = 1
+      patt_info = {"patt": type(patt).__name__,
+                   "orig-lineno": orig_lineno,
+                   "orig-end-lineno": orig_end_lineno,
+                   "delegates": [new_stmt, outside_exp]}
+      stats.append(patt_info)
     elif isinstance(patt, patt_matcher.ApplyVectorizedLambda):
       assert len(stmt_idxs) == 1
       stmt_idx = stmt_idxs[0]
       stmt_list = list_of_lists[stmt_idx]
+      
+      orig_call = patt.apply_call.call.get_obj()
+      orig_lineno = orig_call.lineno
+      orig_end_lineno = orig_call.end_lineno
 
       # These two will have a single element but we're emulating a pointer.
       cond_value_pairs = []
@@ -1320,7 +1437,7 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
           func=AST_name("type"),
           args=[the_series]
         ),
-        rhs=AST_attr_chain("pd.DataFrame"),
+        rhs=pd_DataFrame_prefix,
         op=ast.Eq()
       )
 
@@ -1330,9 +1447,8 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
       #   df['x'] = df.apply(...)
       # but in the following we'll have a problem:
       #   ... = df.apply(...).str.replace()
-      np_select_to_series = \
-        AST_attr_call(ast.Name("pd"), 
-                      ast.Name("Series"), args=[np_select])
+      np_select_to_series = AST_attr_call(ast.Name("pd"),
+                                          "Series", args=[np_select])
 
       rewritten_body = [ast.Return(value=np_select_to_series)]
       original_body = [ast.Return(value=patt.apply_call.call.get_obj())]
@@ -1352,27 +1468,33 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
       stmt_list.insert(0, apply_vec)
 
       # Replace the apply()
-      patt.apply_call.call.set_enclosed_obj(
-        AST_call(func=ast.Name(id=apply_vec_name), args=[the_series])
-      )
+      new_call = AST_call(func=ast.Name(id=apply_vec_name), args=[the_series])
+      patt.apply_call.call.set_enclosed_obj(new_call)
 
-      stats[type(patt).__name__] = 1
-    
+      patt_info = {"patt": type(patt).__name__,
+                   "orig-lineno": orig_lineno,
+                   "orig-end-lineno": orig_end_lineno,
+                   "delegates": [apply_vec, new_call]}
+      stats.append(patt_info)
     elif isinstance(patt, patt_matcher.RemoveAxis1Lambda):
       # Remove axis=1
       call = patt.call_name.attr_call.call.get_obj()
+      orig_lineno = call.lineno
+      orig_end_lineno = call.end_lineno
       kwargs = call.keywords
       axis_1_idx = -1
       for idx, kw in enumerate(kwargs):
         if kw.arg == "axis":
           axis_1_idx = idx
           break
+        # END IF #
+      ### END FOR ###
       assert axis_1_idx != -1
       call.keywords.pop(axis_1_idx)
       # Make row.apply -> row[Name].apply
       attr_ast = patt.call_name.attr_call.get_attr_ast()
       attr_ast.value = \
-        AST_sub_const(AST_name(patt.call_name.get_name()), patt.the_one_series)
+        AST_sub_const(patt.call_name.get_name(), patt.the_one_series)
       
       arg0_name = patt.lam.args.args[0].arg
 
@@ -1382,13 +1504,21 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
       if isinstance(patt.lam.body, ast.Subscript):
         enclosed_sub = patt_matcher.get_enclosed_attr(patt.lam, "body")
         rewrite_enclosed_sub(enclosed_sub, arg0_name, patt.the_one_series)
+      # END IF #
       rewrite_subscripts(patt.lam.body, arg0_name, patt.the_one_series)
 
-      stats[type(patt).__name__] = 1
+      patt_info = {"patt": type(patt).__name__,
+                   "orig-lineno": orig_lineno,
+                   "orig-end-lineno": orig_end_lineno,
+                   "delegates": [patt.lam]}
+      stats.append(patt_info)
     elif isinstance(patt, patt_matcher.FuseApply):
       assert len(stmt_idxs) == 1
       stmt_idx = stmt_idxs[0]
       stmt_list = list_of_lists[stmt_idx]
+      
+      orig_lineno = patt.left_apply.call.get_obj().lineno
+      orig_end_lineno = patt.right_apply.call.get_obj().end_lineno
 
       def call_function_and_assign_result(assign_to: ast.Name, 
                                           function: ast.AST, arg: ast.Name):
@@ -1420,6 +1550,7 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
       # Create a function. We'll add our code there, along with precondition
       # checks and we'll replace the apply() with a call to this function.
 
+      # Local argument so it's fine in terms of name collisions.
       the_series = AST_name("ser")
 
       # We will only allow it to be a Series because otherwise
@@ -1430,7 +1561,7 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
           func=AST_name("type"),
           args=[the_series]
         ),
-        rhs=AST_attr_chain("pd.Series"),
+        rhs=pd_Series_prefix,
         op=ast.Eq()
       )
 
@@ -1463,8 +1594,7 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
         body=[left_call, right_call, fused_append]
       )
       res_to_series = \
-        AST_attr_call(ast.Name("pd"), 
-                      ast.Name("Series"), args=[loop_res])
+        AST_attr_call(ast.Name("pd"), "Series", args=[loop_res])
       return_fused = ast.Return(value=res_to_series)
 
       rewritten_body = [loop_res_init, ls, for_loop, return_fused]
@@ -1490,7 +1620,7 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
         fused_apply_func_name = "_REWR_fused_apply"
         assert fused_apply_func_name not in globals()
       fused_apply_func = AST_function_def(fused_apply_func_name,
-                                   args=[the_series], body=[conditioned])
+                                   args=[the_series.id], body=[conditioned])
       # Insert before the current (top-level) statement
       stmt_list.insert(0, fused_apply_func)
 
@@ -1502,16 +1632,29 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
         args=[original_left_called_on])
       )
 
-      stats[type(patt).__name__] = 1
+      patt_info = {"patt": type(patt).__name__,
+                   "orig-lineno": orig_lineno,
+                   "orig-end-lineno": orig_end_lineno,
+                   "delegates": [fused_apply_func,
+                                 patt.right_apply.call.get_obj()]}
+      stats.append(patt_info)
     elif isinstance(patt, patt_matcher.LenUnique):
-      patt.enclosed_call.set_enclosed_obj(
-        AST_attr_call(
-          called_on=AST_attr_chain('dias.rewriter'),
+      orig_call = patt.enclosed_call.get_obj()
+      orig_lineno = orig_call.lineno
+      orig_end_lineno = orig_call.end_lineno
+      
+      new_call = AST_attr_call(
+          called_on=dias_rewriter_prefix,
           name="len_unique",
           keywords={'series': patt.series}
         )
-      )
-      stats[type(patt).__name__] = 1
+      patt.enclosed_call.set_enclosed_obj(new_call)
+
+      patt_info = {"patt": type(patt).__name__,
+                   "orig-lineno": orig_lineno,
+                   "orig-end-lineno": orig_end_lineno,
+                   "delegates": [new_call]}
+      stats.append(patt_info)
     else:
       # No matched pattern, don't change stmt
       pass
@@ -1522,6 +1665,48 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
       new_source = new_source + astor.to_source(stmt)
     # END: for stmt ...
   # END: for stmt_list ...
+  
+  if line_info:
+    # Convert list_of_lists to an ast.Module
+    body = []
+    for stmt_list in list_of_lists:
+      for stmt in stmt_list:
+        body.append(stmt)
+      ### END FOR ###
+    ### END FOR ###
+    mod = ast.Module(body=body)
+
+    parsed_rewritten = ast.parse(new_source)
+    # parsed_rewritten should have the exact same structure as `mod`. We're
+    # going to co-traverse them to find line information about nodes in `mod`
+    # from `parsed_rewritten`.
+    nodes_to_extract_info_for = set()
+    for patt_info in stats:
+      for delg in patt_info['delegates']:
+        nodes_to_extract_info_for.add(delg)
+      ### END FOR ###
+    ### END FOR ###
+    co_traverse_and_extract_line_info(mod, parsed_rewritten, nodes_to_extract_info_for)
+    
+    new_stats = []
+    for patt_info in stats:
+      delegates = patt_info['delegates']
+      first_delg = delegates[0]
+      last_delg = delegates[-1]
+      assert hasattr(first_delg, "lineno")
+      assert hasattr(last_delg, "end_lineno")
+      new_patt_info = copy.deepcopy(patt_info)
+      del new_patt_info['delegates']
+      new_patt_info['rewr-lineno'] = first_delg.lineno
+      new_patt_info['rewr-end-lineno'] = last_delg.end_lineno
+      new_stats.append(new_patt_info)
+    ### END FOR ###
+    stats = new_stats
+  else:
+    # TODO: Just being backwards compatible with the previous format, but this
+    # could be better.
+    stats = [s['patt'] for s in stats]
+  # END IF #
 
   return new_source, stats
 
@@ -1534,9 +1719,9 @@ def rewrite_ast(cell_ast: ast.Module) -> Tuple[str, Dict]:
 # call_rewrite() from Dias.
 _inside_dias = False
 
-def rewrite_ast_from_source(cell):
+def rewrite_ast_from_source(cell, line_info=False):
   cell_ast = ast.parse(cell)
-  return rewrite_ast(cell_ast)
+  return rewrite_ast(cell_ast, line_info=line_info)
 
 def rewrite(verbose: str, cell: str,
             # If true, this function returns stats, otherwise

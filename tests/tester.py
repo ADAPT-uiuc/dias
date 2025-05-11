@@ -31,7 +31,13 @@ to_test_json = get_to_test_json(to_test)
 correct_json = get_correct_json(correct)
 
 there_was_error = False
-assert len(to_test_json['cells']) == len(correct_json['cells'])
+len_to_test = len(to_test_json['cells'])
+len_correct = len(correct_json['cells'])
+if len_to_test != len_correct:
+  print(len_to_test)
+  print(len_correct)
+  assert False
+# END IF #
 for cell1, cell2 in zip(to_test_json['cells'], correct_json['cells']):
   to_test_mod = cell1['modified']
   correct_mod = cell2['modified']

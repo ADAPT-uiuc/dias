@@ -1,28 +1,28 @@
 {
-  "cells":[
+  "cells": [
     {
-      "raw":"\npopul_df = pd.read_csv(\"./datasets/ampiiere__animal-crossing-villager-popularity-analysis__acnh_villager_data.csv\")\n",
-      "modified":"popul_df = pd.read_csv(\n    './datasets/ampiiere__animal-crossing-villager-popularity-analysis__acnh_villager_data.csv'\n    )\n",
-      "patts-hit":{
-        
-      },
-      "rewritten-exec-time":1.396518
+      "raw": "\npopul_df = pd.read_csv(\"./datasets/ampiiere__animal-crossing-villager-popularity-analysis__acnh_villager_data.csv\")\n",
+      "modified": "popul_df = pd.read_csv(\n    './datasets/ampiiere__animal-crossing-villager-popularity-analysis__acnh_villager_data.csv'\n    )\n",
+      "patts-hit": [],
+      "rewritten-exec-time": 0.956083
     },
     {
-      "raw":"\npopul_df['name'] = popul_df['name'].replace(['OHare'],\"O'Hare\")\npopul_df['name'] = popul_df['name'].replace(['Buck(Brows)'],\"Buck\")\npopul_df['name'] = popul_df['name'].replace(['Renee'],\"Ren\u00e9e\")\npopul_df['name'] = popul_df['name'].replace(['WartJr'],\"Wart Jr.\")\npopul_df['name'] = popul_df['name'].replace(['Crackle(Spork)'],\"Spork\")\nour = popul_df['name'].copy()\n",
-      "modified":"dias.rewriter.replace_remove_list(popul_df['name'], ['OHare'], \"O'Hare\",\n    'OHare', \"O'Hare\", (lambda _DIAS_x1, _DIAS_x2: popul_df['name'].replace\n    (_DIAS_x1, _DIAS_x2, inplace=True)))\ndias.rewriter.replace_remove_list(popul_df['name'], ['Buck(Brows)'], 'Buck',\n    'Buck(Brows)', 'Buck', (lambda _DIAS_x1, _DIAS_x2: popul_df['name'].\n    replace(_DIAS_x1, _DIAS_x2, inplace=True)))\ndias.rewriter.replace_remove_list(popul_df['name'], ['Renee'], 'Renée',\n    'Renee', 'Renée', (lambda _DIAS_x1, _DIAS_x2: popul_df['name'].replace(\n    _DIAS_x1, _DIAS_x2, inplace=True)))\ndias.rewriter.replace_remove_list(popul_df['name'], ['WartJr'], 'Wart Jr.',\n    'WartJr', 'Wart Jr.', (lambda _DIAS_x1, _DIAS_x2: popul_df['name'].\n    replace(_DIAS_x1, _DIAS_x2, inplace=True)))\ndias.rewriter.replace_remove_list(popul_df['name'], ['Crackle(Spork)'],\n    'Spork', 'Crackle(Spork)', 'Spork', (lambda _DIAS_x1, _DIAS_x2:\n    popul_df['name'].replace(_DIAS_x1, _DIAS_x2, inplace=True)))\nour = popul_df['name'].copy()\n",
-      "patts-hit":{
-        "ReplaceRemoveList":1
-      },
-      "rewritten-exec-time":1.260446
+      "raw": "\npopul_df['name'] = popul_df['name'].replace(['OHare'],\"O'Hare\")\npopul_df['name'] = popul_df['name'].replace(['Buck(Brows)'],\"Buck\")\npopul_df['name'] = popul_df['name'].replace(['Renee'],\"Ren\u00e9e\")\npopul_df['name'] = popul_df['name'].replace(['WartJr'],\"Wart Jr.\")\npopul_df['name'] = popul_df['name'].replace(['Crackle(Spork)'],\"Spork\")\nour = popul_df['name'].copy()\n",
+      "modified": "dias.rewriter.replace_remove_list(popul_df['name'], ['OHare'], \"O'Hare\",\n    'OHare', \"O'Hare\", lambda _DIAS_x1, _DIAS_x2: popul_df['name'].replace(\n    _DIAS_x1, _DIAS_x2, inplace=True))\ndias.rewriter.replace_remove_list(popul_df['name'], ['Buck(Brows)'], 'Buck',\n    'Buck(Brows)', 'Buck', lambda _DIAS_x1, _DIAS_x2: popul_df['name'].\n    replace(_DIAS_x1, _DIAS_x2, inplace=True))\ndias.rewriter.replace_remove_list(popul_df['name'], ['Renee'], 'Ren\u00e9e',\n    'Renee', 'Ren\u00e9e', lambda _DIAS_x1, _DIAS_x2: popul_df['name'].replace(\n    _DIAS_x1, _DIAS_x2, inplace=True))\ndias.rewriter.replace_remove_list(popul_df['name'], ['WartJr'], 'Wart Jr.',\n    'WartJr', 'Wart Jr.', lambda _DIAS_x1, _DIAS_x2: popul_df['name'].\n    replace(_DIAS_x1, _DIAS_x2, inplace=True))\ndias.rewriter.replace_remove_list(popul_df['name'], ['Crackle(Spork)'],\n    'Spork', 'Crackle(Spork)', 'Spork', lambda _DIAS_x1, _DIAS_x2: popul_df\n    ['name'].replace(_DIAS_x1, _DIAS_x2, inplace=True))\nour = popul_df['name'].copy()\n",
+      "patts-hit": [
+        "ReplaceRemoveList",
+        "ReplaceRemoveList",
+        "ReplaceRemoveList",
+        "ReplaceRemoveList",
+        "ReplaceRemoveList"
+      ],
+      "rewritten-exec-time": 1.24725
     },
     {
-      "raw":"\nassert (our == popul_df['name']).all()\n",
-      "modified":"assert (our == popul_df['name']).all()\n",
-      "patts-hit":{
-        
-      },
-      "rewritten-exec-time":0.316775
+      "raw": "\nassert (our == popul_df['name']).all()\n",
+      "modified": "assert (our == popul_df['name']).all()\n",
+      "patts-hit": [],
+      "rewritten-exec-time": 0.244584
     }
   ]
 }
