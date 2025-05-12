@@ -1,0 +1,1 @@
+responses_df_2018.replace(['Kaggle Learn'], 'Kaggle Learn Courses',inplace=True)
