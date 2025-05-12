@@ -1,0 +1,1 @@
+df["A"]=df["A"].fillna(5)
