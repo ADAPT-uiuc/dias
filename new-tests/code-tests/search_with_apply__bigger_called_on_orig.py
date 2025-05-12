@@ -1,0 +1,1 @@
+our = pd.read_csv('titanic.csv')['Name'].apply(lambda s: 'G' in s)

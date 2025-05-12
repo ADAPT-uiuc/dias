@@ -1,0 +1,1 @@
+our = pd.Series(df['Name'].tolist() + df['Ticket'].tolist())

@@ -1,0 +1,1 @@
+our_num_tickets = len(df['Ticket'].unique())

@@ -1,0 +1,1 @@
+our = df['Name'].apply(lambda s: 'G' in s)

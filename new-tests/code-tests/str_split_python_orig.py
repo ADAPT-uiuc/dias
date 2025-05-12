@@ -1,0 +1,1 @@
+course[["our_course_unit", "our_course_num"]] = course["course_code"].str.split(" ", expand=True)

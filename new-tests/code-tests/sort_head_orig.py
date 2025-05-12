@@ -1,0 +1,1 @@
+our = train_df['total_score'].sort_values().head(4)
