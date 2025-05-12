@@ -25,10 +25,6 @@ import dias.nb_utils as nb_utils
 
 ############ CONFIGURATIONS ############
 
-_IREWR_JSON_STATS=False
-if "_IREWR_JSON_STATS" in os.environ and os.environ["_IREWR_JSON_STATS"] == "True":
-  _IREWR_JSON_STATS=True
-
 disabled_patts = set()
 if "_IREWR_DISABLED_PATTS" in os.environ:
   disabled_patts = ast.literal_eval(os.environ["_IREWR_DISABLED_PATTS"])
@@ -1762,7 +1758,7 @@ def rewrite(verbose: str, cell: str,
 
   # Create the JSON.
   stats = None
-  if _IREWR_JSON_STATS or ret_stats:
+  if ret_stats:
     stats = dict()
     # NOTE: The original and modified codes might be the same but because the modified code was round-tripped
     # using astor, the strings might not be the same. If you want to test for equality, don't
@@ -1772,15 +1768,7 @@ def rewrite(verbose: str, cell: str,
     stats['patts-hit'] = hit_stats
     # In ns.
     stats['rewritten-exec-time'] = nb_utils.ns_to_ms(time_spent_in_exec)
-
-  # TODO: _IREWR_JSON_STATS should go away now that we can return the stats
-  # from this function and we don't have to print, the parse and all this
-  # hackery. But this requires changing the testing infra too.
-  if _IREWR_JSON_STATS:
-    eprint("[IREWRITE JSON]")
-    dumped_stats = json.dumps(stats, indent=2)
-    eprint(dumped_stats)
-    eprint("[IREWRITE END JSON]")
+  # END IF #
 
   _inside_dias = False
   return (stats if ret_stats else None)

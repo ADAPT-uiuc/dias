@@ -2,7 +2,7 @@ import os
 import glob
 
 SUFF = "_orig.py"
-CODE_TEST_DIR = "code-tests"
+CODE_TEST_DIR = "static-tests"
 orig_files = glob.glob(os.path.join(CODE_TEST_DIR, f"*{SUFF}"))
 
 preamble = \
