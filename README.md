@@ -1,18 +1,18 @@
-<div style="width: 100%; overflow: hidden;">
-  <img src="images/logo.png" style="float: left; width: 150px; margin-right: 10px; margin-bottom: 10px;" />
-  <p>
-    Dias is an automatic rewriter of <code>pandas</code> code for Jupyter (IPython) notebooks.
-    It rewrites <code>pandas</code> code to semantically equivalent but faster versions,
-    on-the-fly, transparently and correctly. Dias is extremely lightweight and it will incur
-    virtually no extra runtime or memory overheads. At the same time, Dias can provide
-    <strong>100x or even 1000x speedups</strong> (see example below).
-  </p>
-  <p>
-    Dias identifies rewrite opportunities automatically and leaves the rest of the code untouched,
-    so you do not have to change a single line of your <code>pandas</code> code to use it.
-  </p>
-</div>
+<p align="center">
+  <img src="./images/logo.png" alt= "dias-logo" width="30%" height="50%">
+</p>
 
+<p>
+  Dias is an automatic rewriter of <code>pandas</code> code for Jupyter (IPython) notebooks.
+  It rewrites <code>pandas</code> code to semantically equivalent but faster versions,
+  on-the-fly, transparently and correctly. Dias is extremely lightweight and it will incur
+  virtually no extra runtime or memory overheads. At the same time, Dias can provide
+  <strong>100x or even 1000x speedups</strong> (see example below).
+</p>
+<p>
+  Dias identifies rewrite opportunities automatically and leaves the rest of the code untouched,
+  so you do not have to change a single line of your <code>pandas</code> code to use it.
+</p>
 
 # Quick Start
 
