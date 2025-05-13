@@ -1,10 +1,20 @@
-# What is Dias?
+<div style="width: 100%; overflow: hidden;">
+  <img src="images/logo.png" style="float: left; width: 150px; margin-right: 10px; margin-bottom: 10px;" />
+  <p>
+    Dias is an automatic rewriter of <code>pandas</code> code for Jupyter (IPython) notebooks.
+    It rewrites <code>pandas</code> code to semantically equivalent but faster versions,
+    on-the-fly, transparently and correctly. Dias is extremely lightweight and it will incur
+    virtually no extra runtime or memory overheads. At the same time, Dias can provide
+    <strong>100x or even 1000x speedups</strong> (see example below).
+  </p>
+  <p>
+    Dias identifies rewrite opportunities automatically and leaves the rest of the code untouched,
+    so you do not have to change a single line of your <code>pandas</code> code to use it.
+  </p>
+</div>
 
-Dias is an automatic rewriter of `pandas` code for Jupyter (IPython) notebooks. It rewrites `pandas` code to semantically equivalent but faster versions, on-the-fly, transparently and correctly. Dias is extremely lightweight and it will incur virtually no extra runtime or memory overheads. At the same time, Dias can provide **100x or even 1000x speedups** (see example below).
 
-Dias identifies rewrite opportunities automatically and leaves the rest of the code untouched, so you do not have to change a single line of your `pandas` code to use it.
-
-## Quick Start
+# Quick Start
 
 <table>
 <tr>
@@ -131,13 +141,13 @@ df.apply(weighted_rating, axis=1)
 </table>
 
 
-### Installation
+## Installation
 
 ```
 pip install dias
 ```
 
-### Usage
+## Usage
 
 Make sure that you are using a Jupyter/IPython notebook.
 
@@ -146,11 +156,11 @@ First import the package... That's it!
 import dias.rewriter
 ```
 
-### Examples
+## Examples
 
 Our [Quickstart notebook](https://colab.research.google.com/drive/1Pe0N8pqfUReVWvYogXuvBD3YHQfhvlOR?usp=sharing) contains many examples in a single place. You can also see our [examples directory](./examples/) which lists self-contained examples that showcase different use cases Dias.
 
-## FAQ
+# FAQ
 
 ### How lightweight is Dias?
 Dias is extremely lightweight. In terms of memory overheads, anything that runs with vanilla `pandas`, runs with Dias enabled too. Dias is just a code rewriter, so it does not alter the way `pandas` stores data and its internal state is minimal.
@@ -179,17 +189,17 @@ Dias is still under early but active development, so expect more patterns to be 
 
 No and no. Dias is not probabilistic; if it rewrites code, it is always correct (barring implementation bugs). Dias is also not intended to be an assistant. First, it's intended to be more quiet than an assistant. If Dias does its job correctly, then you should never have to think of it. Second, while you can inspect the rewritten code, Dias does not offer any explanations of why the rewritten version is faster.
 
-## How to contribute
+# How to contribute
 
 Dias is an ongoing research project by the [ADAPT group @ UIUC](https://github.com/ADAPT-uiuc). You can help us by sending us notebooks that you want to speed up and we will our best to make Dias do it automatically ([send us an email](mailto:sb54@illinois.edu) with either the notebook or Colab link)! Moreover, if you are aware of a pattern that can be rewritten to a faster version, please consider submitting an issue. You can use [our template](https://github.com/ADAPT-uiuc/dias/issues/new?assignees=&labels=pattern&template=pattern-request.md&title=%3CShort+description+of+the+original+and+the+rewritten%3E).
 
 We also welcome feedback from all backgrounds, including industry specialists, data analysts and academics. Please reach out to sb54@illinois.edu to share your opinion!
 
-## Publications
+# Publications
 
 - [Dias: Dynamic Rewriting of Pandas Code](https://arxiv.org/abs/2303.16146)<br/>
 [Stefanos Baziotis](https://sbaziotis.com/), [Daniel Kang](https://ddkang.github.io/), [Charith Mendis](https://charithmendis.com/)<br/>
-SIGMOD 2024
+SIGMOD 2024, <i>Honorable Mention for Best Artifact Award</i>
 
 <details class="bibtex">
     <summary>BibTeX</summary>
