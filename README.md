@@ -25,6 +25,14 @@
 <td>
 <a href="https://colab.research.google.com/drive/1Pe0N8pqfUReVWvYogXuvBD3YHQfhvlOR?usp=sharing">Quickstart Colab Notebook</a>
 </td>
+
+<td>
+<img src="./images/logo.png" alt= "dias-logo" width="50px">
+</td>
+
+<td>
+<a href="https://www.pandas-rewriter.com/">Godbolt-like Online Demo</a>
+</td>
 </tr>
 
 </table>
