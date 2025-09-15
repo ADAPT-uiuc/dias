@@ -1,0 +1,24 @@
+{
+  "cells": [
+    {
+      "raw": "\ndf = pd.read_csv('titanic.csv')\n",
+      "modified": "df = pd.read_csv('titanic.csv')\n",
+      "patts-hit": {},
+      "rewritten-exec-time": 3.460375
+    },
+    {
+      "raw": "\n# DIAS_VERBOSE\nour = df['Name'].sort_values().head(4)\n",
+      "modified": "our = dias.rewriter.sort_head(called_on=df['Name'], by=None, n=4, asc=True,\n    orig=lambda _DIAS_x: _DIAS_x.sort_values().head(4))\n",
+      "patts-hit": {
+          "SortHead": 1
+      },
+      "rewritten-exec-time": 374.231
+    },
+    {
+      "raw": "\n# Convert to list so that we don't take account of the index. See correctness note in sort_head.ipynb\ncomp = [x == y for x, y in zip(our.tolist(), defa.tolist())]\nassert all(comp)\n",
+      "modified": "comp = [(x == y) for x, y in zip(our.tolist(), defa.tolist())]\nassert all(comp)\n",
+      "patts-hit": {},
+      "rewritten-exec-time": 7.40225
+    }
+  ]
+}
